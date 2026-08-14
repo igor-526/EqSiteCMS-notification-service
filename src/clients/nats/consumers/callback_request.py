@@ -26,6 +26,7 @@ class CallbackRequestConsumer:
         self._handler = handler
 
         self._task: asyncio.Task[None] | None = None
+        self._subscription = None
 
     @property
     def is_running(self) -> bool:
@@ -61,15 +62,13 @@ class CallbackRequestConsumer:
             self._subscription = None
 
     async def _consume(self) -> None:
-        subscription = await self._client.jetstream.pull_subscribe(
-            subject=self._settings.nats_subject_callback_requested,
-            durable=self._settings.nats_consumer_callback_requested,
-            stream=self._settings.nats_stream_site_events,
-        )
+        if self._subscription is None:
+            logger.error("Consumer started without subscription")
+            return
 
         while True:
             try:
-                messages = await subscription.fetch(
+                messages = await self._subscription.fetch(
                     batch=self._settings.nats_consumer_fetch_batch_size,
                     timeout=self._settings.nats_consumer_fetch_timeout_seconds,
                 )
@@ -95,7 +94,7 @@ class CallbackRequestConsumer:
             )
         except Exception:
             logger.exception(
-                "Failed to process callback request message",
+                "Failed to process NATS message",
             )
             await message.nak()
             return
