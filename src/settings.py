@@ -123,3 +123,25 @@ class NatsSettings(BaseSettings):
 
 settings = Settings()
 nats_settings = NatsSettings()
+
+
+class MainBackendSettings(BaseSettings):
+    """Настройки для подключения к main backend."""
+    main_backend_url: str = Field(
+        default="http://localhost:8000",
+        alias="MAIN_BACKEND_URL",
+    )
+    main_backend_service_key: str = Field(
+        default="",
+        alias="MAIN_BACKEND_SERVICE_KEY",
+    )
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        populate_by_name=True,
+    )
+
+
+main_backend_settings = MainBackendSettings()

@@ -5,6 +5,7 @@ description = "FastAPI template with Clean Architecture and PostgreSQL"
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
 dependencies = [
+    "aiohttp>=3.12",
     "alembic>=1.16",
     "asyncpg>=0.30",
     "dependency-injector>=4.49.1",
