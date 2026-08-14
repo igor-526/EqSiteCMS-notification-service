@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     environment: str = Field(default="development", alias="ENVIRONMENT")
     debug: bool = Field(default=True, alias="DEBUG")
-    app_title: str = Field(default="FastAPI Template", alias="APP_TITLE")
+    app_title: str = Field(default="Notification Service", alias="APP_TITLE")
 
     sentry_enabled: bool = Field(default=False, alias="SENTRY_ENABLED")
     sentry_dsn: str = Field(default="", alias="SENTRY_DSN")
@@ -127,6 +127,7 @@ nats_settings = NatsSettings()
 
 class MainBackendSettings(BaseSettings):
     """Настройки для подключения к main backend."""
+
     main_backend_url: str = Field(
         default="http://localhost:8000",
         alias="MAIN_BACKEND_URL",
@@ -145,3 +146,26 @@ class MainBackendSettings(BaseSettings):
 
 
 main_backend_settings = MainBackendSettings()
+
+
+class EmailServiceSettings(BaseSettings):
+    """Настройки для подключения к email service."""
+
+    email_service_url: str = Field(
+        default="http://localhost:8000",
+        alias="EMAIL_SERVICE_URL",
+    )
+    email_service_service_key: str = Field(
+        default="",
+        alias="EMAIL_SERVICE_SERVICE_KEY",
+    )
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        populate_by_name=True,
+    )
+
+
+email_service_settings = EmailServiceSettings()

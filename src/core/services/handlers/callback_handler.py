@@ -3,69 +3,65 @@ import uuid
 
 from clients.email_service import EmailServiceClient
 from clients.main_backend import MainBackendClient
-from core.protocols.messaging import NotificationCommandSendEmailPublisherProtocol
-from core.schemas.messaging import CallbackRequestedData, NotificationCommandSendEmailData
+from core.entities.event import EventEntity
+from core.schemas.messaging import NotificationCommandSendEmailData
 
 logger = logging.getLogger(__name__)
 
 SENDER_NAME = "EqSiteCMS"
-SENDER_EMAIL = None  # Используется default из SMTP настроек
 
 
-class CallbackRequestService:
+class CallbackEventHandler:
     def __init__(
         self,
         *,
-        email_publisher: NotificationCommandSendEmailPublisherProtocol,
         main_backend_client: MainBackendClient,
         email_service_client: EmailServiceClient,
     ) -> None:
-        self._email_publisher = email_publisher
         self._main_backend_client = main_backend_client
         self._email_service_client = email_service_client
 
-    async def process(
+    async def format_notification(
         self,
         *,
-        payload: CallbackRequestedData,
-        equestrian_id: uuid.UUID,
-    ) -> None:
-        logger.info(
-            "Processing callback request: callback_request_id=%s, equestrian_id=%s, name=%s, phone=%s",
-            payload.callback_request_id,
-            equestrian_id,
-            payload.name,
-            payload.phone,
-        )
+        channel_code: str,
+        payload: dict,
+        event: EventEntity,
+    ) -> NotificationCommandSendEmailData | None:
+        if channel_code != "email":
+            logger.warning("Unsupported channel for callback: %s", channel_code)
+            return None
+
+        callback_request_id = payload.get("callback_request_id")
+        name = payload.get("name")
+        phone = payload.get("phone")
+        comment = payload.get("comment")
+        equestrian_id = payload.get("equestrian_id")
 
         # Получаем email адреса администраторов
         recipient_emails = await self._get_admin_emails()
         if not recipient_emails:
             logger.warning("No admin emails found, skipping notification")
-            return
+            return None
 
         event_uuid = uuid.uuid4()
-
         subject = "Новый запрос на обратный звонок"
         body = self._build_email_body(
-            callback_request_id=payload.callback_request_id,
-            name=payload.name,
-            phone=payload.phone,
-            comment=payload.comment,
+            callback_request_id=callback_request_id,
+            name=name,
+            phone=phone,
+            comment=comment,
             equestrian_id=equestrian_id,
         )
 
-        email_payload = NotificationCommandSendEmailData(
+        return NotificationCommandSendEmailData(
             event_uuid=event_uuid,
             to=recipient_emails,
             subject=subject,
             body=body,
             from_name=SENDER_NAME,
-            from_email=SENDER_EMAIL,
+            from_email=None,
         )
-
-        event_id = await self._email_publisher.publish(payload=email_payload)
-        logger.info("Email event published: event_id=%s, event_uuid=%s", event_id, event_uuid)
 
     async def _get_admin_emails(self) -> list[str]:
         """Получить email адреса администраторов платформы."""
@@ -91,15 +87,17 @@ class CallbackRequestService:
     @staticmethod
     def _build_email_body(
         *,
-        callback_request_id: uuid.UUID,
+        callback_request_id: str | None,
         name: str | None,
-        phone: str,
+        phone: str | None,
         comment: str | None,
-        equestrian_id: uuid.UUID,
+        equestrian_id: str | None,
     ) -> str:
-        """Формирует HTML тело письма с данными заявки."""
         name_display = name or "Не указано"
         comment_display = comment or "Без комментария"
+        phone_display = phone or "Не указан"
+        callback_id_display = callback_request_id or "Не указан"
+        equestrian_id_display = equestrian_id or "Не указан"
 
         return f"""\
 <!DOCTYPE html>
@@ -110,7 +108,7 @@ class CallbackRequestService:
   <table style="border-collapse: collapse; width: 100%; max-width: 600px;">
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">ID заявки:</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee;">{callback_request_id}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee;">{callback_id_display}</td>
     </tr>
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Имя:</td>
@@ -118,7 +116,7 @@ class CallbackRequestService:
     </tr>
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Телефон:</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee;">{phone}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee;">{phone_display}</td>
     </tr>
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Комментарий:</td>
@@ -126,7 +124,7 @@ class CallbackRequestService:
     </tr>
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">ID всадника:</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee;">{equestrian_id}</td>
+      <td style="padding: 8px; border-bottom: 1px solid #eee;">{equestrian_id_display}</td>
     </tr>
   </table>
 </body>

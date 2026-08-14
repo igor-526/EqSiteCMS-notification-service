@@ -1,6 +1,5 @@
 """HTTP-клиент для взаимодействия с main backend сервисом."""
 
-import asyncio
 from uuid import UUID
 
 import aiohttp
@@ -8,17 +7,18 @@ from pydantic import BaseModel, Field
 
 from core.exceptions.base import AppError
 
-
 # === Exceptions ===
 
 
 class MainBackendClientError(AppError):
     """Базовая ошибка HTTP-клиента main backend."""
+
     status_code = 500
 
 
 class MainBackendConnectionError(MainBackendClientError):
     """Ошибка соединения с main backend."""
+
     status_code = 500
 
     def __init__(self, detail: str = "Не удалось подключиться к main backend") -> None:
@@ -27,6 +27,7 @@ class MainBackendConnectionError(MainBackendClientError):
 
 class MainBackendTimeoutError(MainBackendClientError):
     """Таймаут запроса к main backend."""
+
     status_code = 500
 
     def __init__(self, detail: str = "Превышено время ожидания ответа от main backend") -> None:
@@ -35,6 +36,7 @@ class MainBackendTimeoutError(MainBackendClientError):
 
 class MainBackendResponseError(MainBackendClientError):
     """Ошибка ответа от main backend."""
+
     status_code = 500
 
     def __init__(self, status: int, detail: str = "Ошибка при запросе к main backend") -> None:
@@ -47,12 +49,14 @@ class MainBackendResponseError(MainBackendClientError):
 
 class UserScope(BaseModel):
     """Модель scope пользователя."""
+
     id: UUID
     scope_name: str
 
 
 class UserOutDto(BaseModel):
     """DTO пользователя из main backend."""
+
     id: UUID
     equestrian_id: UUID
     username: str
@@ -66,6 +70,7 @@ class UserOutDto(BaseModel):
 
 class PaginatedUsers(BaseModel):
     """Пагинированный список пользователей."""
+
     items: list[UserOutDto] = Field(default_factory=list)
     total: int = 0
 
@@ -109,13 +114,13 @@ class MainBackendClient:
             MainBackendResponseError: Ошибка ответа от сервера
         """
         url = f"{self._base_url}/api/service/users"
-        
+
         # Формируем query параметры
         params: dict = {
             "limit": limit,
             "offset": offset,
         }
-        
+
         if equestrian_ids:
             params["equestrian_ids"] = [str(id) for id in equestrian_ids]
         if equestrian_service_keys:
@@ -137,15 +142,11 @@ class MainBackendClient:
                             status=response.status,
                             detail=f"Ошибка получения пользователей: {text}",
                         )
-                    
+
                     data = await response.json()
                     return PaginatedUsers.model_validate(data)
 
         except aiohttp.ClientError as e:
-            raise MainBackendConnectionError(
-                detail=f"Ошибка соединения с main backend: {e!s}"
-            ) from e
-        except asyncio.TimeoutError as e:
-            raise MainBackendTimeoutError(
-                detail="Превышено время ожидания ответа от main backend"
-            ) from e
+            raise MainBackendConnectionError(detail=f"Ошибка соединения с main backend: {e!s}") from e
+        except TimeoutError as e:
+            raise MainBackendTimeoutError(detail="Превышено время ожидания ответа от main backend") from e

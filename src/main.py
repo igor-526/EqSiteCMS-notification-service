@@ -10,6 +10,7 @@ from core.exceptions import AppError
 from settings import settings
 from utils.configure_sentry import configure_sentry
 from utils.database import close_database
+from utils.seeding.init_registry import init_registry
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,6 +24,8 @@ configure_sentry()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    await init_registry()
+
     nats_client = container.nats_client()
     callback_request_consumer = container.callback_request_consumer()
 
