@@ -1,14 +1,38 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
+
+import pytest
 
 from core.entities.event import EventEntity
 from core.services.handlers.callback_handler import CallbackEventHandler
 
 
 @pytest.fixture
-def handler():
-    return CallbackEventHandler()
+def mock_main_backend_client():
+    client = AsyncMock()
+    # Mock admin user
+    admin_user = MagicMock()
+    admin_user.id = uuid4()
+    client.get_users.return_value = MagicMock(items=[admin_user])
+    return client
+
+
+@pytest.fixture
+def mock_email_service_client():
+    client = AsyncMock()
+    # Mock user email
+    user_email = MagicMock()
+    user_email.email = "igor-526@yandex.ru"
+    client.get_user_emails.return_value = [user_email]
+    return client
+
+
+@pytest.fixture
+def handler(mock_main_backend_client, mock_email_service_client):
+    return CallbackEventHandler(
+        main_backend_client=mock_main_backend_client,
+        email_service_client=mock_email_service_client,
+    )
 
 
 @pytest.fixture

@@ -1,6 +1,7 @@
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
+
+import pytest
 
 from core.entities.channel import ChannelEntity
 from core.entities.event import EventEntity
@@ -28,17 +29,31 @@ def mock_email_publisher():
 
 
 @pytest.fixture
+def mock_main_backend_client():
+    return AsyncMock()
+
+
+@pytest.fixture
+def mock_email_service_client():
+    return AsyncMock()
+
+
+@pytest.fixture
 def orchestrator(
     mock_channel_repository,
     mock_event_repository,
     mock_user_setting_repository,
     mock_email_publisher,
+    mock_main_backend_client,
+    mock_email_service_client,
 ):
     return NotificationOrchestratorService(
         channel_repository=mock_channel_repository,
         event_repository=mock_event_repository,
         user_setting_repository=mock_user_setting_repository,
         email_publisher=mock_email_publisher,
+        main_backend_client=mock_main_backend_client,
+        email_service_client=mock_email_service_client,
     )
 
 

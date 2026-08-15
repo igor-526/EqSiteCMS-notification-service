@@ -1,6 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
+
+import pytest
 
 from core.entities.event import EventEntity
 from repositories.event import EventRepository
@@ -32,16 +33,20 @@ class TestEventRepository:
     @pytest.mark.asyncio
     async def test_get_by_code_found(self, event_repository, mock_session, sample_event):
         mock_mapping = MagicMock()
-        mock_mapping.__iter__ = MagicMock(return_value=iter({
-            "id": sample_event.id,
-            "code": sample_event.code,
-            "name": sample_event.name,
-            "description": sample_event.description,
-            "metadata": sample_event.metadata,
-            "is_active": sample_event.is_active,
-            "created_at": sample_event.created_at,
-            "updated_at": sample_event.updated_at,
-        }.items()))
+        mock_mapping.__iter__ = MagicMock(
+            return_value=iter(
+                {
+                    "id": sample_event.id,
+                    "code": sample_event.code,
+                    "name": sample_event.name,
+                    "description": sample_event.description,
+                    "metadata": sample_event.metadata,
+                    "is_active": sample_event.is_active,
+                    "created_at": sample_event.created_at,
+                    "updated_at": sample_event.updated_at,
+                }.items()
+            )
+        )
 
         mock_result = MagicMock()
         mock_result.mappings.return_value.first.return_value = mock_mapping
@@ -66,16 +71,20 @@ class TestEventRepository:
     @pytest.mark.asyncio
     async def test_get_active_events(self, event_repository, mock_session, sample_event):
         mock_mapping = MagicMock()
-        mock_mapping.__iter__ = MagicMock(return_value=iter({
-            "id": sample_event.id,
-            "code": sample_event.code,
-            "name": sample_event.name,
-            "description": sample_event.description,
-            "metadata": sample_event.metadata,
-            "is_active": True,
-            "created_at": sample_event.created_at,
-            "updated_at": sample_event.updated_at,
-        }.items()))
+        mock_mapping.__iter__ = MagicMock(
+            return_value=iter(
+                {
+                    "id": sample_event.id,
+                    "code": sample_event.code,
+                    "name": sample_event.name,
+                    "description": sample_event.description,
+                    "metadata": sample_event.metadata,
+                    "is_active": True,
+                    "created_at": sample_event.created_at,
+                    "updated_at": sample_event.updated_at,
+                }.items()
+            )
+        )
 
         mock_result = MagicMock()
         mock_result.mappings.return_value.all.return_value = [mock_mapping]

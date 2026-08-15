@@ -18,6 +18,8 @@ from repositories import ChannelRepository, EventRepository, UserNotificationSet
 from settings import (
     email_service_settings,
     main_backend_settings,
+)
+from settings import (
     nats_settings as nats_settings_instance,
 )
 from utils.database import SessionFactory

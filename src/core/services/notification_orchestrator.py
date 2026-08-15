@@ -1,10 +1,9 @@
 import logging
 from typing import Protocol
 
-from clients.email_service import EmailServiceClient
-from clients.main_backend import MainBackendClient
 from core.entities.channel import ChannelEntity
 from core.entities.event import EventEntity
+from core.protocols.clients import EmailServiceClientProtocol, MainBackendClientProtocol
 from core.protocols.messaging import NotificationCommandSendEmailPublisherProtocol
 from core.schemas.messaging import NotificationCommandSendEmailData
 from repositories.channel import ChannelRepository
@@ -32,8 +31,8 @@ class NotificationOrchestratorService:
         event_repository: EventRepository,
         user_setting_repository: UserNotificationSettingRepository,
         email_publisher: NotificationCommandSendEmailPublisherProtocol,
-        main_backend_client: MainBackendClient,
-        email_service_client: EmailServiceClient,
+        main_backend_client: MainBackendClientProtocol,
+        email_service_client: EmailServiceClientProtocol,
     ) -> None:
         self._channel_repository = channel_repository
         self._event_repository = event_repository

@@ -4,7 +4,7 @@ import logging
 from uuid import UUID
 
 import aiohttp
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .exceptions import (
     EmailServiceConnectionError,
@@ -86,10 +86,6 @@ class EmailServiceClient:
                     return [UserEmail.model_validate(item) for item in data]
 
         except aiohttp.ClientError as e:
-            raise EmailServiceConnectionError(
-                detail=f"Ошибка соединения с email service: {e!s}"
-            ) from e
+            raise EmailServiceConnectionError(detail=f"Ошибка соединения с email service: {e!s}") from e
         except TimeoutError as e:
-            raise EmailServiceTimeoutError(
-                detail="Превышено время ожидания ответа от email service"
-            ) from e
+            raise EmailServiceTimeoutError(detail="Превышено время ожидания ответа от email service") from e

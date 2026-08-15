@@ -1,6 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
+
+import pytest
 
 from core.entities.channel import ChannelEntity
 from repositories.channel import ChannelRepository
@@ -31,15 +32,19 @@ class TestChannelRepository:
     @pytest.mark.asyncio
     async def test_get_by_code_found(self, channel_repository, mock_session, sample_channel):
         mock_mapping = MagicMock()
-        mock_mapping.__iter__ = MagicMock(return_value=iter({
-            "id": sample_channel.id,
-            "code": sample_channel.code,
-            "name": sample_channel.name,
-            "description": sample_channel.description,
-            "is_active": sample_channel.is_active,
-            "created_at": sample_channel.created_at,
-            "updated_at": sample_channel.updated_at,
-        }.items()))
+        mock_mapping.__iter__ = MagicMock(
+            return_value=iter(
+                {
+                    "id": sample_channel.id,
+                    "code": sample_channel.code,
+                    "name": sample_channel.name,
+                    "description": sample_channel.description,
+                    "is_active": sample_channel.is_active,
+                    "created_at": sample_channel.created_at,
+                    "updated_at": sample_channel.updated_at,
+                }.items()
+            )
+        )
 
         mock_result = MagicMock()
         mock_result.mappings.return_value.first.return_value = mock_mapping
@@ -64,15 +69,19 @@ class TestChannelRepository:
     @pytest.mark.asyncio
     async def test_get_active_channels(self, channel_repository, mock_session, sample_channel):
         mock_mapping = MagicMock()
-        mock_mapping.__iter__ = MagicMock(return_value=iter({
-            "id": sample_channel.id,
-            "code": sample_channel.code,
-            "name": sample_channel.name,
-            "description": sample_channel.description,
-            "is_active": True,
-            "created_at": sample_channel.created_at,
-            "updated_at": sample_channel.updated_at,
-        }.items()))
+        mock_mapping.__iter__ = MagicMock(
+            return_value=iter(
+                {
+                    "id": sample_channel.id,
+                    "code": sample_channel.code,
+                    "name": sample_channel.name,
+                    "description": sample_channel.description,
+                    "is_active": True,
+                    "created_at": sample_channel.created_at,
+                    "updated_at": sample_channel.updated_at,
+                }.items()
+            )
+        )
 
         mock_result = MagicMock()
         mock_result.mappings.return_value.all.return_value = [mock_mapping]

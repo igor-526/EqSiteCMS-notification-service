@@ -1,9 +1,8 @@
 import logging
 import uuid
 
-from clients.email_service import EmailServiceClient
-from clients.main_backend import MainBackendClient
 from core.entities.event import EventEntity
+from core.protocols.clients import EmailServiceClientProtocol, MainBackendClientProtocol
 from core.schemas.messaging import NotificationCommandSendEmailData
 
 logger = logging.getLogger(__name__)
@@ -15,8 +14,8 @@ class CallbackEventHandler:
     def __init__(
         self,
         *,
-        main_backend_client: MainBackendClient,
-        email_service_client: EmailServiceClient,
+        main_backend_client: MainBackendClientProtocol,
+        email_service_client: EmailServiceClientProtocol,
     ) -> None:
         self._main_backend_client = main_backend_client
         self._email_service_client = email_service_client

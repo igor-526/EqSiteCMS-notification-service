@@ -1,8 +1,7 @@
 import logging
 import uuid
 
-from clients.email_service import EmailServiceClient
-from clients.main_backend import MainBackendClient
+from core.protocols.clients import EmailServiceClientProtocol, MainBackendClientProtocol
 from core.protocols.messaging import NotificationCommandSendEmailPublisherProtocol
 from core.schemas.messaging import CallbackRequestedData, NotificationCommandSendEmailData
 
@@ -17,8 +16,8 @@ class CallbackRequestService:
         self,
         *,
         email_publisher: NotificationCommandSendEmailPublisherProtocol,
-        main_backend_client: MainBackendClient,
-        email_service_client: EmailServiceClient,
+        main_backend_client: MainBackendClientProtocol,
+        email_service_client: EmailServiceClientProtocol,
     ) -> None:
         self._email_publisher = email_publisher
         self._main_backend_client = main_backend_client
