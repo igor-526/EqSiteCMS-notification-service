@@ -1,4 +1,4 @@
-from nats import NATS
+from nats.aio.client import Client as NATS
 from nats.js import JetStreamContext
 from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy, PubAck, RetentionPolicy, StorageType, StreamConfig
 

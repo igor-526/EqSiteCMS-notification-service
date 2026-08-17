@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 
-class BaseSeeder(abc.ABC):
+class BaseSeeder[Plan, Existing, Missing](abc.ABC):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
@@ -21,13 +21,13 @@ class BaseSeeder(abc.ABC):
         logger.info("%s created 0 entities", self.__class__.__name__)
 
     @abc.abstractmethod
-    async def prepare(self): ...
+    async def prepare(self) -> Plan: ...
 
     @abc.abstractmethod
-    async def fetch_existing(self, plan): ...
+    async def fetch_existing(self, plan: Plan) -> Existing: ...
 
     @abc.abstractmethod
-    def diff(self, plan, existing): ...
+    def diff(self, plan: Plan, existing: Existing) -> Missing: ...
 
     @abc.abstractmethod
-    async def create_missing(self, missing, plan, existing) -> int: ...
+    async def create_missing(self, missing: Missing, plan: Plan, existing: Existing) -> int: ...

@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import Table, delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.entities import Entity
+from core.entities import Entity, TimestampMixin
 
 
 class AbstractRepository[E: Entity](ABC):
@@ -42,7 +42,7 @@ class AbstractRepository[E: Entity](ABC):
 
     async def update(self, entity: E) -> E:
         data = entity.model_dump()
-        if hasattr(entity, "updated_at"):
+        if isinstance(entity, TimestampMixin):
             now = datetime.now(UTC)
             data["updated_at"] = now
             entity.updated_at = now

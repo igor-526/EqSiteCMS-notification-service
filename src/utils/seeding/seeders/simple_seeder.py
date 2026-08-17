@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy import Table, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,7 +8,7 @@ from core.entities.base import Entity
 from .base_seeder import BaseSeeder
 
 
-class SimpleSeeder[T: Entity](BaseSeeder):
+class SimpleSeeder[T: Entity](BaseSeeder[list[T], dict[UUID, T], list[T]]):
     table: Table
     entity_cls: type[T]
     seeds: list[T]
@@ -17,7 +19,7 @@ class SimpleSeeder[T: Entity](BaseSeeder):
     async def prepare(self) -> list[T]:
         return self.seeds
 
-    async def fetch_existing(self, plan: list[T]) -> dict[str, T]:
+    async def fetch_existing(self, plan: list[T]) -> dict[UUID, T]:
         values = [entity.id for entity in plan]
         if not values:
             return {}
@@ -26,11 +28,11 @@ class SimpleSeeder[T: Entity](BaseSeeder):
         rows = await self.session.execute(stmt)
         return {row["id"]: self.entity_cls.model_validate(dict(row)) for row in rows.mappings().all()}
 
-    def diff(self, plan: list[T], existing: dict[str, T]) -> list[T]:
+    def diff(self, plan: list[T], existing: dict[UUID, T]) -> list[T]:
         existing_values = set(existing.keys())
         return [e for e in plan if e.id not in existing_values]
 
-    async def create_missing(self, missing: list[T], plan: list[T], existing: dict[str, T]) -> int:
+    async def create_missing(self, missing: list[T], plan: list[T], existing: dict[UUID, T]) -> int:
         if not missing:
             return 0
         values = [e.model_dump() for e in missing]

@@ -52,7 +52,6 @@ class ApplicationContainer(containers.DeclarativeContainer):
     email_service_client = providers.Singleton(
         EmailServiceClient,
         base_url=email_service_settings.provided.email_service_url,
-        service_key=email_service_settings.provided.email_service_service_key,
     )
 
     # Repositories (per-session)

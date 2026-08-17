@@ -33,7 +33,7 @@ dev = [
 pythonpath = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "--strict-markers"
+addopts = "--strict-markers -m 'not infrastructure'"
 markers = [
     "infrastructure: requires local infrastructure, another service, an external provider, or secrets",
 ]

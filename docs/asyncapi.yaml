@@ -1,0 +1,89 @@
+asyncapi: 2.6.0
+info:
+  title: EqSiteCMS Notification Service Messaging
+  version: 1.0.0
+  description: Canonical callback consumer and email-command producer contract.
+servers:
+  jetstream:
+    url: nats://eqcms-nats:4222
+    protocol: nats
+channels:
+  events.site.callback.requested:
+    x-jetstream-stream: SITE_EVENTS
+    x-jetstream-consumer:
+      durable: notification-service-callback-requested
+      ack-policy: explicit
+      ack-wait-seconds: 30
+      max-deliver: 5
+    subscribe:
+      operationId: consumeCallbackRequested
+      message:
+        $ref: "#/components/messages/CallbackRequested"
+  commands.notification.email.send:
+    x-jetstream-stream: NOTIFICATION_COMMANDS
+    publish:
+      operationId: publishNotificationEmailCommand
+      message:
+        $ref: "#/components/messages/NotificationEmailCommand"
+components:
+  messages:
+    CallbackRequested:
+      name: CallbackRequested
+      headers:
+        $ref: "#/components/schemas/CallbackHeaders"
+      payload:
+        $ref: "#/components/schemas/CallbackRequestedPayload"
+    NotificationEmailCommand:
+      name: NotificationEmailCommand
+      headers:
+        $ref: "#/components/schemas/IdempotencyHeaders"
+      payload:
+        $ref: "#/components/schemas/NotificationEmailPayload"
+  schemas:
+    IdempotencyHeaders:
+      type: object
+      additionalProperties: false
+      required: [Nats-Msg-Id]
+      properties:
+        Nats-Msg-Id:
+          type: string
+          format: uuid
+    CallbackHeaders:
+      type: object
+      additionalProperties: false
+      required: [Nats-Msg-Id, X-Equestrian-Id]
+      properties:
+        Nats-Msg-Id:
+          type: string
+          format: uuid
+        X-Equestrian-Id:
+          type: string
+          format: uuid
+    CallbackRequestedPayload:
+      type: object
+      additionalProperties: false
+      required: [occurred_at, callback_request_id, phone]
+      properties:
+        occurred_at: {type: string, format: date-time}
+        callback_request_id: {type: string, format: uuid}
+        name: {type: [string, "null"]}
+        comment: {type: [string, "null"]}
+        phone: {type: string}
+    NotificationEmailPayload:
+      type: object
+      additionalProperties: false
+      required: [occurred_at, event_uuid, to, subject, body]
+      properties:
+        occurred_at: {type: string, format: date-time}
+        event_uuid: {type: string, format: uuid}
+        to:
+          type: array
+          minItems: 1
+          items: {type: string}
+        subject: {type: string, minLength: 1, maxLength: 500}
+        body: {type: string, minLength: 1}
+        cc: {type: [array, "null"], items: {type: string}}
+        bcc: {type: [array, "null"], items: {type: string}}
+        reply_to: {type: [string, "null"]}
+        from_name: {type: [string, "null"]}
+        from_email: {type: [string, "null"]}

@@ -33,9 +33,8 @@ class UserEmail(BaseModel):
 class EmailServiceClient:
     """HTTP-клиент для email service."""
 
-    def __init__(self, base_url: str, service_key: str, timeout: float = 30.0) -> None:
+    def __init__(self, base_url: str, timeout: float = 30.0) -> None:
         self._base_url = base_url.rstrip("/")
-        self._service_key = service_key
         self._timeout = aiohttp.ClientTimeout(total=timeout)
 
     async def get_user_emails(
