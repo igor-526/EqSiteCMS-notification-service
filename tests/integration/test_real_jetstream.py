@@ -3,7 +3,7 @@ import os
 import uuid
 from pathlib import Path
 
-import asyncpg
+import asyncpg  # type: ignore[import-untyped]
 import pytest
 from nats.aio.client import Client as NATS
 from nats.errors import TimeoutError
@@ -86,7 +86,7 @@ async def test_real_backend_notification_email_adapter_compatibility() -> None:
     suffix = uuid.uuid4().hex[:12]
     backend_durable = f"it-backend-{suffix}"
     email_durable = f"it-email-{suffix}"
-    settings = NatsSettings(nats_servers_raw="nats://127.0.0.1:4222")
+    settings = NatsSettings(NATS_SERVERS="nats://127.0.0.1:4222")
     nc = NATS()
     await asyncio.wait_for(nc.connect("nats://127.0.0.1:4222"), timeout=5)
     js = nc.jetstream()

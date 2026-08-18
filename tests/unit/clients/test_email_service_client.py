@@ -10,7 +10,7 @@ from settings import EmailServiceSettings
 def test_email_settings_have_no_peer_credential(monkeypatch) -> None:
     monkeypatch.setenv("EMAIL_SERVICE_SERVICE_KEY", "obsolete-peer-secret")
 
-    configured = EmailServiceSettings(email_service_url="http://email-service:8000")
+    configured = EmailServiceSettings(EMAIL_SERVICE_URL="http://email-service:8000")
 
     assert "email_service_service_key" not in type(configured).model_fields
     assert configured.email_service_url == "http://email-service:8000"

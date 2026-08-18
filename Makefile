@@ -7,6 +7,9 @@ format:
 
 lint:
 	uv run mypy src tests
+	uv run basedpyright
+	uv run ruff check .
+	uv run ruff format --check .
 	uv run flake8 src tests
 
 test:
