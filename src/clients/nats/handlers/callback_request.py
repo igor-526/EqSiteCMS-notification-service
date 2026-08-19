@@ -2,7 +2,7 @@ import logging
 import uuid
 
 from core.schemas.messaging import CallbackRequestedData
-from core.services import CallbackRequestService, NotificationOrchestratorService
+from core.services import NotificationOrchestratorService
 
 logger = logging.getLogger(__name__)
 
@@ -11,10 +11,8 @@ class CallbackRequestHandler:
     def __init__(
         self,
         *,
-        service: CallbackRequestService,
         orchestrator: NotificationOrchestratorService,
     ) -> None:
-        self._service = service
         self._orchestrator = orchestrator
 
     async def handle(

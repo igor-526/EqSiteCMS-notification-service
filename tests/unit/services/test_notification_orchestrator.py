@@ -94,6 +94,8 @@ class TestNotificationOrchestrator:
         mock_event_repository.get_by_code.return_value = sample_event
         mock_channel_repository.get_active_channels.return_value = [sample_channel]
         mock_email_publisher.publish.return_value = uuid4()
+        setting = MagicMock(user_id=uuid4(), channel_id=sample_channel.id)
+        orchestrator._user_setting_repository.get_users_by_event.return_value = [setting]
 
         # Регистрируем мок-обработчик
         mock_handler = AsyncMock()
@@ -114,6 +116,7 @@ class TestNotificationOrchestrator:
         mock_event_repository.get_by_code.assert_called_once_with("callback")
         mock_channel_repository.get_active_channels.assert_called_once()
         mock_handler.format_notification.assert_called_once()
+        assert mock_handler.format_notification.call_args.kwargs["enabled_user_ids"] == {setting.user_id}
 
     @pytest.mark.asyncio
     async def test_process_event_not_found(

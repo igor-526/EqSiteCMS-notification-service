@@ -1,5 +1,6 @@
 import logging
 from typing import Protocol
+from uuid import UUID
 
 from core.entities.channel import ChannelEntity
 from core.entities.event import EventEntity
@@ -20,6 +21,7 @@ class EventHandlerProtocol(Protocol):
         channel_code: str,
         payload: dict,
         event: EventEntity,
+        enabled_user_ids: set[UUID],
     ) -> NotificationCommandSendEmailData | None: ...
 
 
@@ -43,6 +45,11 @@ class NotificationOrchestratorService:
         self._handlers: dict[str, EventHandlerProtocol] = {}
 
     def register_handler(self, event_code: str, handler: EventHandlerProtocol) -> None:
+        registered = self._handlers.get(event_code)
+        if registered is handler:
+            return
+        if registered is not None:
+            raise RuntimeError(f"Handler already registered for event: {event_code}")
         self._handlers[event_code] = handler
 
     async def process_event(
@@ -51,7 +58,12 @@ class NotificationOrchestratorService:
         event_code: str,
         payload: dict,
     ) -> None:
-        logger.info("Processing event: event_code=%s", event_code)
+        correlation_id = payload.get("callback_request_id")
+        logger.info(
+            "Processing event: event_code=%s, correlation_id=%s",
+            event_code,
+            correlation_id,
+        )
 
         # 1. Получить событие из БД по коду
         event = await self._event_repository.get_by_code(event_code)
@@ -93,6 +105,7 @@ class NotificationOrchestratorService:
                 channel=channel,
                 event=event,
                 payload=payload,
+                enabled_user_ids={setting.user_id for setting in user_settings if setting.channel_id == channel.id},
             )
 
     async def _process_channel(
@@ -102,6 +115,7 @@ class NotificationOrchestratorService:
         channel: ChannelEntity,
         event: EventEntity,
         payload: dict,
+        enabled_user_ids: set[UUID],
     ) -> None:
         logger.info(
             "Processing channel: channel_code=%s, event_code=%s",
@@ -114,19 +128,22 @@ class NotificationOrchestratorService:
             channel_code=channel.code,
             payload=payload,
             event=event,
+            enabled_user_ids=enabled_user_ids,
         )
 
         if not notification:
             logger.warning(
-                "Handler returned None for channel: channel_code=%s",
+                "Handler returned no notification: channel_code=%s, correlation_id=%s",
                 channel.code,
+                payload.get("callback_request_id"),
             )
             return
 
         # Отправить команду на доставку
         event_id = await self._email_publisher.publish(payload=notification)
         logger.info(
-            "Notification command published: event_id=%s, channel_code=%s",
+            "Notification command published: event_id=%s, channel_code=%s, correlation_id=%s",
             event_id,
             channel.code,
+            payload.get("callback_request_id"),
         )

@@ -12,3 +12,7 @@ class ClientError(AppError):
 
 class AlreadyExistsError(ClientError):
     status_code = 409
+
+
+class NotFoundError(ClientError):
+    status_code = 404

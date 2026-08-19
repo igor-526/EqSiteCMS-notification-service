@@ -10,8 +10,6 @@ from clients.nats import (
 )
 from core.services import (
     CallbackEventHandler,
-    CallbackRequestService,
-    EventHandlerRegistry,
     NotificationOrchestratorService,
 )
 from repositories import ChannelRepository, EventRepository, UserNotificationSettingRepository
@@ -55,7 +53,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     )
 
     # Repositories (per-session)
-    session_factory = providers.Object(SessionFactory)
+    session_factory = providers.Factory(SessionFactory)
 
     channel_repository = providers.Factory(
         ChannelRepository,
@@ -79,10 +77,6 @@ class ApplicationContainer(containers.DeclarativeContainer):
         email_service_client=email_service_client,
     )
 
-    event_handler_registry = providers.Singleton(
-        EventHandlerRegistry,
-    )
-
     # Services
     notification_orchestrator = providers.Singleton(
         NotificationOrchestratorService,
@@ -94,17 +88,9 @@ class ApplicationContainer(containers.DeclarativeContainer):
         email_service_client=email_service_client,
     )
 
-    callback_request_service = providers.Singleton(
-        CallbackRequestService,
-        email_publisher=notification_commands_send_email_publisher,
-        main_backend_client=main_backend_client,
-        email_service_client=email_service_client,
-    )
-
     # NATS Handlers
     callback_request_handler = providers.Singleton(
         CallbackRequestHandler,
-        service=callback_request_service,
         orchestrator=notification_orchestrator,
     )
 
@@ -114,3 +100,10 @@ class ApplicationContainer(containers.DeclarativeContainer):
         settings=nats_settings,
         handler=callback_request_handler,
     )
+
+
+def wire_event_handlers(container: ApplicationContainer) -> NotificationOrchestratorService:
+    """Wire the single production callback path before consumers start."""
+    orchestrator = container.notification_orchestrator()
+    orchestrator.register_handler("callback", container.callback_event_handler())
+    return orchestrator

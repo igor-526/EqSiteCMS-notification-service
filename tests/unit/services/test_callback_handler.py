@@ -23,6 +23,8 @@ def mock_email_service_client():
     # Mock user email
     user_email = MagicMock()
     user_email.email = "igor-526@yandex.ru"
+    user_email.user_id = None
+    user_email.approved = True
     client.get_user_emails.return_value = [user_email]
     return client
 
@@ -49,7 +51,9 @@ def sample_event():
 
 class TestCallbackEventHandler:
     @pytest.mark.asyncio
-    async def test_format_notification_email(self, handler, sample_event):
+    async def test_format_notification_email(
+        self, handler, sample_event, mock_main_backend_client, mock_email_service_client
+    ):
         payload = {
             "callback_request_id": str(uuid4()),
             "name": "Иван",
@@ -58,14 +62,18 @@ class TestCallbackEventHandler:
             "equestrian_id": str(uuid4()),
         }
 
+        eligible_id = mock_main_backend_client.get_users.return_value.items[0].id
+        mock_email_service_client.get_user_emails.return_value[0].user_id = eligible_id
         result = await handler.format_notification(
             channel_code="email",
             payload=payload,
             event=sample_event,
+            enabled_user_ids={eligible_id},
         )
 
         assert result is not None
         assert result.to == ["igor-526@yandex.ru"]
+        mock_main_backend_client.get_users.assert_awaited_once_with(role=["ADMIN", "SUPERUSER"])
         assert "запрос на обратный звонок" in result.subject.lower()
         assert "Иван" in result.body
         assert "+79999999999" in result.body
@@ -82,18 +90,24 @@ class TestCallbackEventHandler:
             channel_code="sms",
             payload=payload,
             event=sample_event,
+            enabled_user_ids=set(),
         )
 
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_format_notification_missing_fields(self, handler, sample_event):
+    async def test_format_notification_missing_fields(
+        self, handler, sample_event, mock_main_backend_client, mock_email_service_client
+    ):
         payload = {}
 
+        eligible_id = mock_main_backend_client.get_users.return_value.items[0].id
+        mock_email_service_client.get_user_emails.return_value[0].user_id = eligible_id
         result = await handler.format_notification(
             channel_code="email",
             payload=payload,
             event=sample_event,
+            enabled_user_ids={eligible_id},
         )
 
         assert result is not None

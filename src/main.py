@@ -5,7 +5,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from containers.application import ApplicationContainer
+from api import notification_settings_router
+from containers.application import ApplicationContainer, wire_event_handlers
 from core.exceptions import AppError
 from settings import settings
 from utils.configure_sentry import configure_sentry
@@ -25,6 +26,7 @@ configure_sentry()
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await init_registry()
+    wire_event_handlers(container)
 
     nats_client = container.nats_client()
     callback_request_consumer = container.callback_request_consumer()
@@ -42,6 +44,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title=settings.app_title, debug=settings.debug, lifespan=lifespan)
+app.include_router(notification_settings_router)
 
 
 @app.get("/health", tags=["Health"])

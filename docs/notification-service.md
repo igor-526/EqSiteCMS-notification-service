@@ -31,7 +31,7 @@ Notification Service — микросервис для обработки соб
 2. **Валидация** — Проверка структуры данных
 3. **Поиск события в БД** — Получение metadata события
 4. **Получение каналов** — Активные каналы доставки
-5. **Поиск обработчика** — EventHandlerRegistry по коду события
+5. **Поиск обработчика** — зарегистрированный в orchestrator обработчик по коду события
 6. **Форматирование** — Обработчик формирует уведомление
 7. **Публикация команды** — NATS Publisher отправляет команду
 
@@ -109,14 +109,6 @@ Notification Service — микросервис для обработки соб
 - `register_handler(event_code, handler)` — регистрация обработчика
 - `process_event(event_code, payload)` — обработка события
 
-### EventHandlerRegistry
-
-Реестр обработчиков событий.
-
-**Методы:**
-- `register(event_code, handler)` — регистрация обработчика
-- `get_handler(event_code)` — получение обработчика
-
 ### CallbackEventHandler
 
 Обработчик события "callback" (обратный звонок).
@@ -175,9 +167,9 @@ class ApplicationContainer(containers.DeclarativeContainer):
 
     # Services
     notification_orchestrator = providers.Singleton(NotificationOrchestratorService, ...)
-    callback_request_service = providers.Singleton(CallbackRequestService, ...)
 
     # Handlers
+    # Единственный wired callback path: NATS consumer -> handler -> orchestrator.
     callback_request_handler = providers.Singleton(CallbackRequestHandler, ...)
 ```
 

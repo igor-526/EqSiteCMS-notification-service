@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, cast
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -12,6 +13,16 @@ from core.protocols.messaging.handlers.callback_request import (
 )
 from core.schemas.messaging import NotificationCommandSendEmailData
 from settings import NatsSettings
+
+
+def test_asyncapi_documents_canonical_runtime_subjects() -> None:
+    document = (Path(__file__).parents[3] / "docs" / "asyncapi.yaml").read_text()
+    settings = NatsSettings()
+
+    assert f"  {settings.nats_subject_callback_requested}:" in document
+    assert f"  {settings.nats_subject_notification_commands_send_email}:" in document
+    assert "Nats-Msg-Id" in document
+    assert "NotificationEmailPayload" in document
 
 
 class RecordingNatsClient:

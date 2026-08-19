@@ -8,6 +8,7 @@ from core.schemas.messaging import NotificationCommandSendEmailData
 logger = logging.getLogger(__name__)
 
 SENDER_NAME = "EqSiteCMS"
+CALLBACK_ELIGIBLE_ROLES: tuple[str, ...] = ("ADMIN", "SUPERUSER")
 
 
 class CallbackEventHandler:
@@ -26,6 +27,7 @@ class CallbackEventHandler:
         channel_code: str,
         payload: dict,
         event: EventEntity,
+        enabled_user_ids: set[uuid.UUID],
     ) -> NotificationCommandSendEmailData | None:
         if channel_code != "email":
             logger.warning("Unsupported channel for callback: %s", channel_code)
@@ -38,7 +40,7 @@ class CallbackEventHandler:
         equestrian_id = payload.get("equestrian_id")
 
         # Получаем email адреса администраторов
-        recipient_emails = await self._get_admin_emails()
+        recipient_emails = await self._get_recipient_emails(enabled_user_ids=enabled_user_ids)
         if not recipient_emails:
             logger.warning("No admin emails found, skipping notification")
             return None
@@ -62,25 +64,25 @@ class CallbackEventHandler:
             from_email=None,
         )
 
-    async def _get_admin_emails(self) -> list[str]:
-        """Получить email адреса администраторов платформы."""
+    async def _get_recipient_emails(self, *, enabled_user_ids: set[uuid.UUID]) -> list[str]:
+        """Intersect current role eligibility, enabled settings and confirmed emails."""
+        if not enabled_user_ids:
+            return []
         try:
-            # Получаем администраторов из main backend
-            admins = await self._main_backend_client.get_users(role=["admin"])
-            if not admins.items:
-                logger.warning("No admin users found")
+            eligible_users = await self._main_backend_client.get_users(role=list(CALLBACK_ELIGIBLE_ROLES))
+            eligible_ids = {user.id for user in eligible_users.items}
+            recipient_ids = eligible_ids & enabled_user_ids
+            if not recipient_ids:
+                logger.info("No eligible users with enabled callback email setting")
                 return []
 
-            # Получаем email адреса из email service
-            user_ids = [admin.id for admin in admins.items]
             emails = await self._email_service_client.get_user_emails(
-                user_ids=user_ids,
+                user_ids=list(recipient_ids),
                 approved=True,
             )
-
-            return [email.email for email in emails]
+            return [email.email for email in emails if email.approved and email.user_id in recipient_ids]
         except Exception:
-            logger.exception("Failed to get admin emails")
+            logger.exception("Recipient lookup failed; callback notification suppressed")
             return []
 
     @staticmethod
