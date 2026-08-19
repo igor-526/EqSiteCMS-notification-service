@@ -10,12 +10,6 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, alias="DEBUG")
     app_title: str = Field(default="Notification Service", alias="APP_TITLE")
 
-    sentry_enabled: bool = Field(default=False, alias="SENTRY_ENABLED")
-    sentry_dsn: str = Field(default="", alias="SENTRY_DSN")
-    sentry_environment: str = Field(default="development", alias="SENTRY_ENVIRONMENT")
-    sentry_traces_sample_rate: float = Field(default=0.0, alias="SENTRY_TRACES_SAMPLE_RATE", ge=0.0, le=1.0)
-    sentry_release: str | None = Field(default=None, alias="SENTRY_RELEASE")
-
     postgres_user: str = Field(default="app", alias="POSTGRES_USER")
     postgres_password: str = Field(default="app", alias="POSTGRES_PASSWORD")
     postgres_host: str = Field(default="localhost", alias="POSTGRES_HOST")
@@ -26,8 +20,6 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> Settings:
-        if self.sentry_enabled and not self.sentry_dsn:
-            raise ValueError("SENTRY_DSN is required when SENTRY_ENABLED=true")
         if self.environment.lower() == "production":
             required = (
                 "POSTGRES_PASSWORD",
@@ -51,6 +43,27 @@ class Settings(BaseSettings):
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+
+
+class SentrySettings(BaseSettings):
+    sentry_enabled: bool = Field(default=False, alias="SENTRY_ENABLED")
+    sentry_dsn: str = Field(default="", alias="SENTRY_DSN")
+    sentry_environment: str = Field(default="development", alias="SENTRY_ENVIRONMENT")
+    sentry_traces_sample_rate: float = Field(default=0.0, alias="SENTRY_TRACES_SAMPLE_RATE", ge=0.0, le=1.0)
+    sentry_release: str | None = Field(default=None, alias="SENTRY_RELEASE")
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        populate_by_name=True,
+    )
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> SentrySettings:
+        if self.sentry_enabled and not self.sentry_dsn:
+            raise ValueError("SENTRY_DSN is required when SENTRY_ENABLED=true")
+        return self
 
 
 class NatsSettings(BaseSettings):
@@ -137,10 +150,6 @@ class NatsSettings(BaseSettings):
     )
 
 
-settings = Settings()
-nats_settings = NatsSettings()
-
-
 class MainBackendSettings(BaseSettings):
     """Настройки для подключения к main backend."""
 
@@ -161,9 +170,6 @@ class MainBackendSettings(BaseSettings):
     )
 
 
-main_backend_settings = MainBackendSettings()
-
-
 class EmailServiceSettings(BaseSettings):
     """Настройки для подключения к email service."""
 
@@ -179,4 +185,8 @@ class EmailServiceSettings(BaseSettings):
     )
 
 
+settings = Settings()
+sentry_settings = SentrySettings()
+nats_settings = NatsSettings()
+main_backend_settings = MainBackendSettings()
 email_service_settings = EmailServiceSettings()

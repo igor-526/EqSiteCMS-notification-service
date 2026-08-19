@@ -23,3 +23,8 @@ imageTag: latest
 migration:
   command: ["uv", "run", "alembic", "-c", "alembic.ini", "upgrade", "head"]
   workingDir: /app/src
+
+metrics:
+  enabled: true
+  metricsPort: 9000
+  interval: 30s

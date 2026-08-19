@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: {{ .Values.name }}-service
   namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.name }}
 spec:
   type: ClusterIP
   ports:

@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from prometheus_client import start_http_server
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from api import notification_settings_router
 from containers.application import ApplicationContainer, wire_event_handlers
@@ -27,23 +29,35 @@ configure_sentry()
 async def lifespan(_: FastAPI):
     await init_registry()
     wire_event_handlers(container)
-
     nats_client = container.nats_client()
     callback_request_consumer = container.callback_request_consumer()
-
+    await nats_client.connect()
+    await nats_client.setup()
+    await callback_request_consumer.start()
+    metrics_runtime = None
+    if settings.environment == "production":
+        metrics_runtime = start_http_server(
+            port=9000,
+            addr="0.0.0.0",
+        )
     try:
-        await nats_client.connect()
-        await nats_client.setup()
-        await callback_request_consumer.start()
-
         yield
     finally:
+        if metrics_runtime is not None:
+            metrics_server, metrics_thread = metrics_runtime
+
+            metrics_server.shutdown()
+            metrics_server.server_close()
+            metrics_thread.join()
         await callback_request_consumer.stop()
         await nats_client.close()
         await close_database()
 
 
 app = FastAPI(title=settings.app_title, debug=settings.debug, lifespan=lifespan)
+
+Instrumentator().instrument(app)
+
 app.include_router(notification_settings_router)
 
 
