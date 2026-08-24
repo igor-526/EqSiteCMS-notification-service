@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from prometheus_client import start_http_server
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from api import notification_settings_router
@@ -13,6 +12,7 @@ from core.exceptions import AppError
 from settings import settings
 from utils.configure_sentry import configure_sentry
 from utils.database import close_database
+from utils.observability import start_metrics_runtime
 from utils.seeding.init_registry import init_registry
 
 logging.basicConfig(
@@ -34,21 +34,12 @@ async def lifespan(_: FastAPI):
     await nats_client.connect()
     await nats_client.setup()
     await callback_request_consumer.start()
-    metrics_runtime = None
-    if settings.environment == "production":
-        metrics_runtime = start_http_server(
-            port=9000,
-            addr="0.0.0.0",
-        )
+    metrics_runtime = start_metrics_runtime(environment=settings.environment)
     try:
         yield
     finally:
         if metrics_runtime is not None:
-            metrics_server, metrics_thread = metrics_runtime
-
-            metrics_server.shutdown()
-            metrics_server.server_close()
-            metrics_thread.join()
+            metrics_runtime.close()
         await callback_request_consumer.stop()
         await nats_client.close()
         await close_database()

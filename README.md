@@ -2,6 +2,11 @@
 
 Сервис уведомлений для EqSiteCMS. Обрабатывает события через NATS и формирует команды на доставку уведомлений.
 
+Сервис использует опциональный Sentry и production Prometheus listener
+`:9000/metrics` во внутренней Docker network. Общая матрица переменных,
+sanitization, проверка и rollback описаны в
+[`docs/operations/observability.md`](../../docs/operations/observability.md).
+
 ## Архитектура
 
 ### Слои
