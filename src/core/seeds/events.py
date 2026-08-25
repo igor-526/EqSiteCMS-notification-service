@@ -9,9 +9,9 @@ EVENT_SEEDS: list[EventEntity] = [
         name="Обратный звонок",
         description="Обработка формы заявки на обратный звонок",
         metadata={
+            "callback_request_id": {"required": True, "type": "uuid4"},
             "phone": {"required": True, "type": "phone_number"},
             "comment": {"required": False, "type": "string"},
-            "equestrian_id": {"required": True, "type": "uuid4"},
         },
         is_active=True,
     ),

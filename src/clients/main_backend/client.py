@@ -150,3 +150,29 @@ class MainBackendClient:
             raise MainBackendConnectionError(detail=f"Ошибка соединения с main backend: {e!s}") from e
         except TimeoutError as e:
             raise MainBackendTimeoutError(detail="Превышено время ожидания ответа от main backend") from e
+
+    async def confirm_callback_delivery(self, *, callback_request_id: UUID) -> None:
+        """Idempotently confirm that a callback email command was published."""
+        url = f"{self._base_url}/api/service/callback_requests/{callback_request_id}/notifications-delivered"
+        headers = {
+            "X-Service-Key": self._service_key,
+            "Content-Type": "application/json",
+        }
+
+        try:
+            async with aiohttp.ClientSession(timeout=self._timeout) as session:
+                async with session.patch(
+                    url,
+                    json={"notifications_delivered": True},
+                    headers=headers,
+                ) as response:
+                    if response.status != 200:
+                        text = await response.text()
+                        raise MainBackendResponseError(
+                            status=response.status,
+                            detail=f"Ошибка подтверждения публикации callback-уведомления: {text}",
+                        )
+        except aiohttp.ClientError as e:
+            raise MainBackendConnectionError(detail=f"Ошибка соединения с main backend: {e!s}") from e
+        except TimeoutError as e:
+            raise MainBackendTimeoutError(detail="Превышено время ожидания ответа от main backend") from e

@@ -102,14 +102,14 @@ class TestNotificationOrchestrator:
         mock_handler.format_notification.return_value = MagicMock()
         orchestrator.register_handler("callback", mock_handler)
 
+        callback_request_id = uuid4()
         await orchestrator.process_event(
             event_code="callback",
             payload={
-                "callback_request_id": str(uuid4()),
+                "callback_request_id": str(callback_request_id),
                 "name": "Test",
                 "phone": "+79999999999",
                 "comment": "Test comment",
-                "equestrian_id": str(uuid4()),
             },
         )
 
@@ -117,6 +117,13 @@ class TestNotificationOrchestrator:
         mock_channel_repository.get_active_channels.assert_called_once()
         mock_handler.format_notification.assert_called_once()
         assert mock_handler.format_notification.call_args.kwargs["enabled_user_ids"] == {setting.user_id}
+        mock_email_publisher.publish.assert_awaited_once_with(
+            payload=mock_handler.format_notification.return_value,
+            idempotency_key=callback_request_id,
+        )
+        orchestrator._main_backend_client.confirm_callback_delivery.assert_awaited_once_with(
+            callback_request_id=callback_request_id
+        )
 
     @pytest.mark.asyncio
     async def test_process_event_not_found(
@@ -163,7 +170,7 @@ class TestNotificationOrchestrator:
 
         await orchestrator.process_event(
             event_code="callback",
-            payload={"equestrian_id": str(uuid4())},
+            payload={"callback_request_id": str(uuid4())},
         )
 
         mock_channel_repository.get_active_channels.assert_called_once()
@@ -182,7 +189,71 @@ class TestNotificationOrchestrator:
 
         await orchestrator.process_event(
             event_code="callback",
-            payload={"equestrian_id": str(uuid4())},
+            payload={"callback_request_id": str(uuid4())},
         )
 
         # Не должен падать, просто залогирует warning
+
+    @pytest.mark.asyncio
+    async def test_no_notification_does_not_confirm_delivery(
+        self, orchestrator, mock_event_repository, mock_channel_repository, sample_event, sample_channel
+    ):
+        mock_event_repository.get_by_code.return_value = sample_event
+        mock_channel_repository.get_active_channels.return_value = [sample_channel]
+        orchestrator._user_setting_repository.get_users_by_event.return_value = []
+        handler = AsyncMock()
+        handler.format_notification.return_value = None
+        orchestrator.register_handler("callback", handler)
+
+        await orchestrator.process_event(
+            event_code="callback",
+            payload={"callback_request_id": str(uuid4()), "phone": "+70000000000"},
+        )
+
+        orchestrator._email_publisher.publish.assert_not_awaited()
+        orchestrator._main_backend_client.confirm_callback_delivery.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_publish_error_does_not_confirm_delivery(
+        self, orchestrator, mock_event_repository, mock_channel_repository, sample_event, sample_channel
+    ):
+        mock_event_repository.get_by_code.return_value = sample_event
+        mock_channel_repository.get_active_channels.return_value = [sample_channel]
+        orchestrator._user_setting_repository.get_users_by_event.return_value = []
+        handler = AsyncMock()
+        handler.format_notification.return_value = MagicMock()
+        orchestrator.register_handler("callback", handler)
+        orchestrator._email_publisher.publish.side_effect = RuntimeError("publish failed")
+
+        with pytest.raises(RuntimeError, match="publish failed"):
+            await orchestrator.process_event(
+                event_code="callback",
+                payload={"callback_request_id": str(uuid4()), "phone": "+70000000000"},
+            )
+
+        orchestrator._main_backend_client.confirm_callback_delivery.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_service_update_error_propagates_after_publish_for_retry(
+        self, orchestrator, mock_event_repository, mock_channel_repository, sample_event, sample_channel
+    ):
+        callback_request_id = uuid4()
+        mock_event_repository.get_by_code.return_value = sample_event
+        mock_channel_repository.get_active_channels.return_value = [sample_channel]
+        orchestrator._user_setting_repository.get_users_by_event.return_value = []
+        handler = AsyncMock()
+        handler.format_notification.return_value = MagicMock()
+        orchestrator.register_handler("callback", handler)
+        orchestrator._email_publisher.publish.return_value = callback_request_id
+        orchestrator._main_backend_client.confirm_callback_delivery.side_effect = RuntimeError("service failed")
+
+        with pytest.raises(RuntimeError, match="service failed"):
+            await orchestrator.process_event(
+                event_code="callback",
+                payload={"callback_request_id": str(callback_request_id), "phone": "+70000000000"},
+            )
+
+        orchestrator._email_publisher.publish.assert_awaited_once_with(
+            payload=handler.format_notification.return_value,
+            idempotency_key=callback_request_id,
+        )

@@ -1,4 +1,7 @@
-.PHONY: format lint test test-infra
+.PHONY: asyncapi-validate format lint test test-infra
+
+asyncapi-validate:
+	npx --yes @asyncapi/cli@6.0.2 validate docs/asyncapi.yaml
 
 format:
 	uv run ruff check . --fix

@@ -18,7 +18,7 @@ def event() -> EventEntity:
 
 
 def payload() -> dict[str, str]:
-    return {"callback_request_id": str(uuid4()), "equestrian_id": str(uuid4()), "phone": "+70000000000"}
+    return {"callback_request_id": str(uuid4()), "phone": "+70000000000"}
 
 
 @pytest.mark.asyncio

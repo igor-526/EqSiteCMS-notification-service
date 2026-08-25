@@ -1,5 +1,6 @@
 import logging
 import uuid
+from html import escape
 
 from core.entities.event import EventEntity
 from core.protocols.clients import EmailServiceClientProtocol, MainBackendClientProtocol
@@ -33,11 +34,9 @@ class CallbackEventHandler:
             logger.warning("Unsupported channel for callback: %s", channel_code)
             return None
 
-        callback_request_id = payload.get("callback_request_id")
         name = payload.get("name")
         phone = payload.get("phone")
         comment = payload.get("comment")
-        equestrian_id = payload.get("equestrian_id")
 
         # Получаем email адреса администраторов
         recipient_emails = await self._get_recipient_emails(enabled_user_ids=enabled_user_ids)
@@ -48,11 +47,9 @@ class CallbackEventHandler:
         event_uuid = uuid.uuid4()
         subject = "Новый запрос на обратный звонок"
         body = self._build_email_body(
-            callback_request_id=callback_request_id,
             name=name,
             phone=phone,
             comment=comment,
-            equestrian_id=equestrian_id,
         )
 
         return NotificationCommandSendEmailData(
@@ -88,17 +85,13 @@ class CallbackEventHandler:
     @staticmethod
     def _build_email_body(
         *,
-        callback_request_id: str | None,
         name: str | None,
         phone: str | None,
         comment: str | None,
-        equestrian_id: str | None,
     ) -> str:
-        name_display = name or "Не указано"
-        comment_display = comment or "Без комментария"
-        phone_display = phone or "Не указан"
-        callback_id_display = callback_request_id or "Не указан"
-        equestrian_id_display = equestrian_id or "Не указан"
+        name_display = escape(name) if name else "Не указано"
+        comment_display = escape(comment) if comment else "Без комментария"
+        phone_display = escape(phone) if phone else "Не указан"
 
         return f"""\
 <!DOCTYPE html>
@@ -107,10 +100,6 @@ class CallbackEventHandler:
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
   <h2 style="color: #2c5aa0;">Новый запрос на обратный звонок</h2>
   <table style="border-collapse: collapse; width: 100%; max-width: 600px;">
-    <tr>
-      <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">ID заявки:</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee;">{callback_id_display}</td>
-    </tr>
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Имя:</td>
       <td style="padding: 8px; border-bottom: 1px solid #eee;">{name_display}</td>
@@ -122,10 +111,6 @@ class CallbackEventHandler:
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Комментарий:</td>
       <td style="padding: 8px; border-bottom: 1px solid #eee;">{comment_display}</td>
-    </tr>
-    <tr>
-      <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">ID всадника:</td>
-      <td style="padding: 8px; border-bottom: 1px solid #eee;">{equestrian_id_display}</td>
     </tr>
   </table>
 </body>

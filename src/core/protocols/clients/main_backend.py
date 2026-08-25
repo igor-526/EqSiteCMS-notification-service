@@ -1,6 +1,7 @@
 """Протокол клиента main backend для использования в core слое."""
 
 from typing import Any, Protocol
+from uuid import UUID
 
 
 class MainBackendClientProtocol(Protocol):
@@ -16,4 +17,8 @@ class MainBackendClientProtocol(Protocol):
         offset: int = 0,
     ) -> Any:
         """Получить список пользователей с фильтрацией и пагинацией."""
+        ...
+
+    async def confirm_callback_delivery(self, *, callback_request_id: UUID) -> None:
+        """Подтвердить успешную публикацию callback email-команды."""
         ...

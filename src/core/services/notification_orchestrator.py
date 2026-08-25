@@ -75,38 +75,39 @@ class NotificationOrchestratorService:
             logger.warning("Event is not active: event_code=%s", event_code)
             return
 
-        # 2. Получить equestrian_id из payload
-        equestrian_id = payload.get("equestrian_id")
-        if not equestrian_id:
-            logger.warning("equestrian_id not found in payload")
-            return
-
-        # 3. Получить активные каналы
+        # 2. Получить активные каналы
         channels = await self._channel_repository.get_active_channels()
         if not channels:
             logger.warning("No active channels found")
             return
 
-        # 4. Получить настройки пользователей из БД
+        # 3. Получить настройки пользователей из БД
         user_settings = await self._user_setting_repository.get_users_by_event(event.id)
         if not user_settings:
             logger.warning("No user settings found for event: event_code=%s", event_code)
 
-        # 5. Найти обработчик для события
+        # 4. Найти обработчик для события
         handler = self._handlers.get(event_code)
         if not handler:
             logger.warning("Handler not found for event: event_code=%s", event_code)
             return
 
-        # 6. Для каждого канала сформировать и отправить уведомление
+        # 5. Для каждого канала сформировать и отправить уведомление
+        published = False
         for channel in channels:
-            await self._process_channel(
+            channel_published = await self._process_channel(
                 handler=handler,
                 channel=channel,
                 event=event,
                 payload=payload,
                 enabled_user_ids={setting.user_id for setting in user_settings if setting.channel_id == channel.id},
             )
+            published = channel_published or published
+
+        if published and event_code == "callback":
+            if not correlation_id:
+                raise ValueError("callback_request_id is required for delivery confirmation")
+            await self._main_backend_client.confirm_callback_delivery(callback_request_id=UUID(str(correlation_id)))
 
     async def _process_channel(
         self,
@@ -116,7 +117,7 @@ class NotificationOrchestratorService:
         event: EventEntity,
         payload: dict,
         enabled_user_ids: set[UUID],
-    ) -> None:
+    ) -> bool:
         logger.info(
             "Processing channel: channel_code=%s, event_code=%s",
             channel.code,
@@ -137,13 +138,19 @@ class NotificationOrchestratorService:
                 channel.code,
                 payload.get("callback_request_id"),
             )
-            return
+            return False
 
         # Отправить команду на доставку
-        event_id = await self._email_publisher.publish(payload=notification)
+        correlation_id = payload.get("callback_request_id")
+        idempotency_key = UUID(str(correlation_id)) if correlation_id else None
+        event_id = await self._email_publisher.publish(
+            payload=notification,
+            idempotency_key=idempotency_key,
+        )
         logger.info(
             "Notification command published: event_id=%s, channel_code=%s, correlation_id=%s",
             event_id,
             channel.code,
             payload.get("callback_request_id"),
         )
+        return True

@@ -7,6 +7,7 @@ import pytest
 
 from clients.nats.client import NatsJetstreamClient
 from clients.nats.consumers.callback_request import CallbackRequestConsumer
+from clients.nats.handlers.callback_request import CallbackRequestHandler
 from clients.nats.publisher import NotificationCommandsSendEmailEventPublisher
 from core.protocols.messaging.handlers.callback_request import (
     CallbackRequestHandlerProtocol,
@@ -70,10 +71,65 @@ async def test_notification_email_publisher_matches_subject_headers_and_payload(
         body="<p>Call back</p>",
     )
 
-    event_id = await publisher.publish(payload=payload)
+    idempotency_key = uuid4()
+    event_id = await publisher.publish(payload=payload, idempotency_key=idempotency_key)
 
     call = client.calls[0]
     decoded = NotificationCommandSendEmailData.model_validate_json(call["payload"])
     assert call["subject"] == "commands.notification.email.send"
-    assert call["headers"] == {"Nats-Msg-Id": str(event_id)}
+    assert event_id == idempotency_key
+    assert call["headers"] == {"Nats-Msg-Id": str(idempotency_key)}
     assert decoded == payload
+
+
+def test_asyncapi_callback_contract_has_no_equestrian_identity() -> None:
+    document = (Path(__file__).parents[3] / "docs" / "asyncapi.yaml").read_text()
+
+    assert "callback_request_id" in document
+    assert "X-Equestrian-Id" not in document
+    assert "equestrian_id" not in document
+
+
+@pytest.mark.asyncio
+async def test_callback_handler_accepts_payload_without_equestrian_header() -> None:
+    orchestrator = AsyncMock()
+    handler = CallbackRequestHandler(orchestrator=orchestrator)
+    callback_request_id = uuid4()
+
+    await handler.handle(
+        payload=(
+            '{"occurred_at":"2026-08-24T12:00:00Z",'
+            f'"callback_request_id":"{callback_request_id}",'
+            '"name":null,"comment":null,"phone":"+70000000000"}'
+        ).encode(),
+        headers={"Nats-Msg-Id": str(uuid4())},
+    )
+
+    orchestrator.process_event.assert_awaited_once_with(
+        event_code="callback",
+        payload={
+            "callback_request_id": str(callback_request_id),
+            "name": None,
+            "phone": "+70000000000",
+            "comment": None,
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_callback_consumer_naks_service_update_failure_for_retry() -> None:
+    handler = AsyncMock()
+    handler.handle.side_effect = RuntimeError("service update failed")
+    consumer = CallbackRequestConsumer(
+        client=cast(NatsJetstreamClient, RecordingNatsClient()),
+        settings=NatsSettings(),
+        handler=cast(CallbackRequestHandlerProtocol, handler),
+    )
+    message = AsyncMock()
+    message.headers = {"Nats-Msg-Id": str(uuid4())}
+    message.data = b"{}"
+
+    await consumer._process_message(message)
+
+    message.nak.assert_awaited_once_with()
+    message.ack.assert_not_awaited()

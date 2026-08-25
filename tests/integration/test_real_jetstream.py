@@ -1,7 +1,10 @@
 import asyncio
+import json
 import os
+import subprocess
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 import asyncpg  # type: ignore[import-untyped]
 import pytest
@@ -13,6 +16,56 @@ from clients.nats.client import NatsJetstreamClient
 from clients.nats.publisher import NotificationCommandsSendEmailEventPublisher
 from core.schemas.messaging import CallbackRequestedData, NotificationCommandSendEmailData
 from settings import NatsSettings
+
+
+def _discover_email_database_dsn() -> str:
+    """Resolve the running Compose email database without exposing credentials."""
+    configured = os.getenv("EMAIL_TEST_DATABASE_DSN")
+    if configured:
+        return configured
+
+    result = subprocess.run(
+        [
+            "docker",
+            "ps",
+            "--filter",
+            "label=com.docker.compose.service=db-email",
+            "--format",
+            "{{.ID}}",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    container_ids = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    if not container_ids:
+        fallback = subprocess.run(
+            ["docker", "inspect", "eqsitecms-db-email", "--format", "{{.Id}}"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        container_ids = [fallback.stdout.strip()]
+    if len(container_ids) != 1:
+        raise RuntimeError(f"Expected one running db-email container, found {len(container_ids)}")
+
+    inspection = subprocess.run(
+        ["docker", "inspect", container_ids[0]],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    details = json.loads(inspection.stdout)[0]
+    environment = dict(item.split("=", 1) for item in details["Config"]["Env"] if "=" in item)
+    bindings = details["NetworkSettings"]["Ports"].get("5432/tcp") or []
+    if not bindings:
+        raise RuntimeError("db-email must publish PostgreSQL port 5432 for the infrastructure gate")
+
+    user = environment["POSTGRES_USER"]
+    password = environment["POSTGRES_PASSWORD"]
+    database = environment["POSTGRES_DB"]
+    port = bindings[0]["HostPort"]
+    return f"postgresql://{quote(user)}:{quote(password)}@127.0.0.1:{port}/{quote(database)}"
 
 
 @pytest.mark.infrastructure
@@ -127,7 +180,6 @@ async def main():
     try:
         await CallbackRequestEventPublisher(client=client, settings=settings).publish(
             payload=CallbackRequestedData(callback_request_id=uuid.uuid4(), phone='+70000000000'),
-            equestrian_id=uuid.uuid4(),
         )
     finally:
         await client.close()
@@ -148,7 +200,7 @@ asyncio.run(main())
         callback = CallbackRequestedData.model_validate_json(callback_message.data)
         assert callback.phone == "+70000000000"
         assert callback_message.headers is not None
-        assert uuid.UUID(callback_message.headers["X-Equestrian-Id"])
+        assert "X-Equestrian-Id" not in callback_message.headers
         assert uuid.UUID(callback_message.headers["Nats-Msg-Id"])
         await callback_message.ack()
 
@@ -189,7 +241,8 @@ asyncio.run(main())
         assert uuid.UUID(email_message.headers["Nats-Msg-Id"])
         await email_message.ack()
 
-        database = await asyncpg.connect(os.environ["EMAIL_TEST_DATABASE_DSN"])
+        database_dsn = await asyncio.to_thread(_discover_email_database_dsn)
+        database = await asyncpg.connect(database_dsn)
         try:
             deadline = asyncio.get_running_loop().time() + 10
             while True:

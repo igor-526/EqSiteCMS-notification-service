@@ -40,7 +40,10 @@ class NotificationCommandsSendEmailEventPublisher(NatsEventPublisher):
             settings=settings,
         )
 
-    async def publish(self, *, payload: NotificationCommandSendEmailData) -> UUID:
-        event = MessagingEvent(event_subject=self._settings.nats_subject_notification_commands_send_email)
+    async def publish(self, *, payload: NotificationCommandSendEmailData, idempotency_key: UUID | None = None) -> UUID:
+        event = MessagingEvent(
+            event_id=idempotency_key or UUID(str(payload.event_uuid)),
+            event_subject=self._settings.nats_subject_notification_commands_send_email,
+        )
         await self._publish_event(event=event, payload=payload)
         return event.event_id

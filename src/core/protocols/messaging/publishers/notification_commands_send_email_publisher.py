@@ -9,4 +9,5 @@ class NotificationCommandSendEmailPublisherProtocol(Protocol):
         self,
         *,
         payload: NotificationCommandSendEmailData,
+        idempotency_key: UUID | None = None,
     ) -> UUID: ...

@@ -1,5 +1,4 @@
 import logging
-import uuid
 
 from core.schemas.messaging import CallbackRequestedData
 from core.services import NotificationOrchestratorService
@@ -24,11 +23,6 @@ class CallbackRequestHandler:
         event_data = CallbackRequestedData.model_validate_json(
             payload,
         )
-        try:
-            equestrian_id = uuid.UUID(headers.get("X-Equestrian-Id"))
-        except ValueError as ex:
-            raise ValueError("Can't parse Equestrian UUID") from ex
-
         # Используем orchestrator для обработки через БД
         await self._orchestrator.process_event(
             event_code="callback",
@@ -37,6 +31,5 @@ class CallbackRequestHandler:
                 "name": event_data.name,
                 "phone": event_data.phone,
                 "comment": event_data.comment,
-                "equestrian_id": str(equestrian_id),
             },
         )

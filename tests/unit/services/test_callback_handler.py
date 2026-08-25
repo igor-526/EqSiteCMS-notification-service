@@ -54,12 +54,12 @@ class TestCallbackEventHandler:
     async def test_format_notification_email(
         self, handler, sample_event, mock_main_backend_client, mock_email_service_client
     ):
+        callback_request_id = str(uuid4())
         payload = {
-            "callback_request_id": str(uuid4()),
+            "callback_request_id": callback_request_id,
             "name": "Иван",
             "phone": "+79999999999",
             "comment": "Тестовый комментарий",
-            "equestrian_id": str(uuid4()),
         }
 
         eligible_id = mock_main_backend_client.get_users.return_value.items[0].id
@@ -77,6 +77,12 @@ class TestCallbackEventHandler:
         assert "запрос на обратный звонок" in result.subject.lower()
         assert "Иван" in result.body
         assert "+79999999999" in result.body
+        assert "Тестовый комментарий" in result.body
+        assert callback_request_id not in result.subject
+        assert callback_request_id not in result.body
+        assert "UUID" not in result.body
+        assert "ID заявки" not in result.body
+        assert "ID всадника" not in result.body
 
     @pytest.mark.asyncio
     async def test_format_notification_unsupported_channel(self, handler, sample_event):
@@ -99,7 +105,7 @@ class TestCallbackEventHandler:
     async def test_format_notification_missing_fields(
         self, handler, sample_event, mock_main_backend_client, mock_email_service_client
     ):
-        payload = {}
+        payload = {"callback_request_id": str(uuid4()), "phone": "+79999999999"}
 
         eligible_id = mock_main_backend_client.get_users.return_value.items[0].id
         mock_email_service_client.get_user_emails.return_value[0].user_id = eligible_id
@@ -112,3 +118,5 @@ class TestCallbackEventHandler:
 
         assert result is not None
         assert "Не указано" in result.body
+        assert "Без комментария" in result.body
+        assert payload["callback_request_id"] not in result.body
