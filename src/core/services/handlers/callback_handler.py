@@ -37,9 +37,16 @@ class CallbackEventHandler:
         name = payload.get("name")
         phone = payload.get("phone")
         comment = payload.get("comment")
+        try:
+            equestrian_id = uuid.UUID(str(payload["equestrian_id"]))
+        except KeyError, TypeError, ValueError:
+            logger.exception("Invalid tenant identity; callback notification suppressed")
+            return None
 
-        # Получаем email адреса администраторов
-        recipient_emails = await self._get_recipient_emails(enabled_user_ids=enabled_user_ids)
+        recipient_emails = await self._get_recipient_emails(
+            equestrian_id=equestrian_id,
+            enabled_user_ids=enabled_user_ids,
+        )
         if not recipient_emails:
             logger.warning("No admin emails found, skipping notification")
             return None
@@ -61,12 +68,20 @@ class CallbackEventHandler:
             from_email=None,
         )
 
-    async def _get_recipient_emails(self, *, enabled_user_ids: set[uuid.UUID]) -> list[str]:
+    async def _get_recipient_emails(
+        self,
+        *,
+        equestrian_id: uuid.UUID,
+        enabled_user_ids: set[uuid.UUID],
+    ) -> list[str]:
         """Intersect current role eligibility, enabled settings and confirmed emails."""
         if not enabled_user_ids:
             return []
         try:
-            eligible_users = await self._main_backend_client.get_users(role=list(CALLBACK_ELIGIBLE_ROLES))
+            eligible_users = await self._main_backend_client.get_users(
+                equestrian_ids=[equestrian_id],
+                role=list(CALLBACK_ELIGIBLE_ROLES),
+            )
             eligible_ids = {user.id for user in eligible_users.items}
             recipient_ids = eligible_ids & enabled_user_ids
             if not recipient_ids:

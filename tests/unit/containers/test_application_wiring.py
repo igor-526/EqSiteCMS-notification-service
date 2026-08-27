@@ -43,10 +43,12 @@ async def test_production_container_wires_single_callback_path_and_publishes() -
     assert orchestrator._handlers == {"callback": container.callback_event_handler()}
 
     callback_request_id = uuid4()
+    equestrian_id = uuid4()
     await orchestrator.process_event(
         event_code="callback",
         payload={
             "callback_request_id": str(callback_request_id),
+            "equestrian_id": str(equestrian_id),
             "phone": "+70000000000",
         },
     )
@@ -54,5 +56,5 @@ async def test_production_container_wires_single_callback_path_and_publishes() -
     publisher.publish.assert_awaited_once()
     command = publisher.publish.await_args.kwargs["payload"]
     assert command.to == ["eligible@example.com"]
-    backend_client.get_users.assert_awaited_once_with(role=["ADMIN", "SUPERUSER"])
+    backend_client.get_users.assert_awaited_once_with(equestrian_ids=[equestrian_id], role=["ADMIN", "SUPERUSER"])
     backend_client.confirm_callback_delivery.assert_awaited_once_with(callback_request_id=callback_request_id)

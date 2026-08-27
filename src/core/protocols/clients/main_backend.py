@@ -10,7 +10,7 @@ class MainBackendClientProtocol(Protocol):
     async def get_users(
         self,
         *,
-        equestrian_ids: list[Any] | None = None,
+        equestrian_ids: list[UUID] | None = None,
         equestrian_service_keys: list[str] | None = None,
         role: list[str] | None = None,
         limit: int = 100,

@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
+import yaml  # type: ignore[import-untyped]
 
 from clients.nats.client import NatsJetstreamClient
 from clients.nats.consumers.callback_request import CallbackRequestConsumer
@@ -12,7 +13,7 @@ from clients.nats.publisher import NotificationCommandsSendEmailEventPublisher
 from core.protocols.messaging.handlers.callback_request import (
     CallbackRequestHandlerProtocol,
 )
-from core.schemas.messaging import NotificationCommandSendEmailData
+from core.schemas.messaging import CallbackRequestedData, NotificationCommandSendEmailData
 from settings import NatsSettings
 
 
@@ -82,23 +83,60 @@ async def test_notification_email_publisher_matches_subject_headers_and_payload(
     assert decoded == payload
 
 
-def test_asyncapi_callback_contract_has_no_equestrian_identity() -> None:
+def test_asyncapi_callback_contract_requires_equestrian_identity() -> None:
     document = (Path(__file__).parents[3] / "docs" / "asyncapi.yaml").read_text()
 
     assert "callback_request_id" in document
-    assert "X-Equestrian-Id" not in document
-    assert "equestrian_id" not in document
+    assert "required: [occurred_at, equestrian_id, callback_request_id, phone]" in document
+    assert "equestrian_id: {type: string, format: uuid}" in document
+    assert "additionalProperties: false" in document
+
+
+def test_backend_and_notification_asyncapi_callback_schemas_match() -> None:
+    service_root = Path(__file__).parents[3]
+    notification_document = yaml.safe_load((service_root / "docs" / "asyncapi.yaml").read_text())
+    backend_document = yaml.safe_load((service_root.parent / "backend" / "docs" / "asyncapi.yaml").read_text())
+
+    notification_schema = notification_document["components"]["schemas"]["CallbackRequestedPayload"]
+    backend_schema = backend_document["components"]["schemas"]["CallbackRequestedPayload"]
+
+    assert notification_schema == backend_schema
+
+
+def test_callback_consumer_dto_accepts_valid_tenant_and_forbids_extra_fields() -> None:
+    tenant_id = uuid4()
+    callback_request_id = uuid4()
+    dto = CallbackRequestedData.model_validate(
+        {
+            "equestrian_id": str(tenant_id),
+            "callback_request_id": str(callback_request_id),
+            "phone": "+70000000000",
+        }
+    )
+
+    assert dto.equestrian_id == tenant_id
+    with pytest.raises(ValueError):
+        CallbackRequestedData.model_validate(
+            {
+                "equestrian_id": str(tenant_id),
+                "callback_request_id": str(callback_request_id),
+                "phone": "+70000000000",
+                "unexpected": True,
+            }
+        )
 
 
 @pytest.mark.asyncio
-async def test_callback_handler_accepts_payload_without_equestrian_header() -> None:
+async def test_callback_handler_accepts_payload_with_tenant_identity() -> None:
     orchestrator = AsyncMock()
     handler = CallbackRequestHandler(orchestrator=orchestrator)
     callback_request_id = uuid4()
+    equestrian_id = uuid4()
 
     await handler.handle(
         payload=(
             '{"occurred_at":"2026-08-24T12:00:00Z",'
+            f'"equestrian_id":"{equestrian_id}",'
             f'"callback_request_id":"{callback_request_id}",'
             '"name":null,"comment":null,"phone":"+70000000000"}'
         ).encode(),
@@ -109,11 +147,49 @@ async def test_callback_handler_accepts_payload_without_equestrian_header() -> N
         event_code="callback",
         payload={
             "callback_request_id": str(callback_request_id),
+            "equestrian_id": str(equestrian_id),
             "name": None,
             "phone": "+70000000000",
             "comment": None,
         },
     )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"callback_request_id": str(uuid4()), "phone": "+70000000000"},
+        {
+            "equestrian_id": "not-a-uuid",
+            "callback_request_id": str(uuid4()),
+            "phone": "+70000000000",
+        },
+    ],
+)
+def test_callback_consumer_dto_rejects_missing_or_malformed_tenant(payload: dict[str, str]) -> None:
+    with pytest.raises(ValueError):
+        CallbackRequestedData.model_validate(payload)
+
+
+@pytest.mark.asyncio
+async def test_callback_redelivery_preserves_tenant_and_correlation_boundaries() -> None:
+    orchestrator = AsyncMock()
+    handler = CallbackRequestHandler(orchestrator=orchestrator)
+    tenant_id = uuid4()
+    callback_request_id = uuid4()
+    event = CallbackRequestedData(
+        equestrian_id=tenant_id,
+        callback_request_id=callback_request_id,
+        phone="+70000000000",
+    )
+
+    await handler.handle(payload=event.model_dump_json().encode(), headers={})
+    await handler.handle(payload=event.model_dump_json().encode(), headers={})
+
+    assert orchestrator.process_event.await_count == 2
+    for call in orchestrator.process_event.await_args_list:
+        assert call.kwargs["payload"]["equestrian_id"] == str(tenant_id)
+        assert call.kwargs["payload"]["callback_request_id"] == str(callback_request_id)
 
 
 @pytest.mark.asyncio

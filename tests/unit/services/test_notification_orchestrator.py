@@ -103,10 +103,12 @@ class TestNotificationOrchestrator:
         orchestrator.register_handler("callback", mock_handler)
 
         callback_request_id = uuid4()
+        equestrian_id = uuid4()
         await orchestrator.process_event(
             event_code="callback",
             payload={
                 "callback_request_id": str(callback_request_id),
+                "equestrian_id": str(equestrian_id),
                 "name": "Test",
                 "phone": "+79999999999",
                 "comment": "Test comment",

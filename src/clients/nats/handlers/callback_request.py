@@ -28,6 +28,7 @@ class CallbackRequestHandler:
             event_code="callback",
             payload={
                 "callback_request_id": str(event_data.callback_request_id),
+                "equestrian_id": str(event_data.equestrian_id),
                 "name": event_data.name,
                 "phone": event_data.phone,
                 "comment": event_data.comment,

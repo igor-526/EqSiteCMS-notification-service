@@ -55,8 +55,10 @@ class TestCallbackEventHandler:
         self, handler, sample_event, mock_main_backend_client, mock_email_service_client
     ):
         callback_request_id = str(uuid4())
+        equestrian_id = uuid4()
         payload = {
             "callback_request_id": callback_request_id,
+            "equestrian_id": str(equestrian_id),
             "name": "Иван",
             "phone": "+79999999999",
             "comment": "Тестовый комментарий",
@@ -73,13 +75,17 @@ class TestCallbackEventHandler:
 
         assert result is not None
         assert result.to == ["igor-526@yandex.ru"]
-        mock_main_backend_client.get_users.assert_awaited_once_with(role=["ADMIN", "SUPERUSER"])
+        mock_main_backend_client.get_users.assert_awaited_once_with(
+            equestrian_ids=[equestrian_id], role=["ADMIN", "SUPERUSER"]
+        )
         assert "запрос на обратный звонок" in result.subject.lower()
         assert "Иван" in result.body
         assert "+79999999999" in result.body
         assert "Тестовый комментарий" in result.body
         assert callback_request_id not in result.subject
         assert callback_request_id not in result.body
+        assert str(equestrian_id) not in result.subject
+        assert str(equestrian_id) not in result.body
         assert "UUID" not in result.body
         assert "ID заявки" not in result.body
         assert "ID всадника" not in result.body
@@ -88,6 +94,7 @@ class TestCallbackEventHandler:
     async def test_format_notification_unsupported_channel(self, handler, sample_event):
         payload = {
             "callback_request_id": str(uuid4()),
+            "equestrian_id": str(uuid4()),
             "name": "Иван",
             "phone": "+79999999999",
         }
@@ -105,7 +112,11 @@ class TestCallbackEventHandler:
     async def test_format_notification_missing_fields(
         self, handler, sample_event, mock_main_backend_client, mock_email_service_client
     ):
-        payload = {"callback_request_id": str(uuid4()), "phone": "+79999999999"}
+        payload = {
+            "callback_request_id": str(uuid4()),
+            "equestrian_id": str(uuid4()),
+            "phone": "+79999999999",
+        }
 
         eligible_id = mock_main_backend_client.get_users.return_value.items[0].id
         mock_email_service_client.get_user_emails.return_value[0].user_id = eligible_id
