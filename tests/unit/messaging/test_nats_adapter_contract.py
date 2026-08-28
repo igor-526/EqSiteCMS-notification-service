@@ -16,6 +16,7 @@ from core.protocols.messaging.handlers.callback_request import (
 )
 from core.schemas.messaging import CallbackRequestedData, NotificationCommandSendEmailData
 from settings import NatsSettings
+from tests.support.cross_repo import load_sibling_asyncapi
 
 
 def test_asyncapi_documents_canonical_runtime_subjects() -> None:
@@ -96,7 +97,7 @@ def test_asyncapi_callback_contract_requires_equestrian_identity() -> None:
 def test_backend_and_notification_asyncapi_callback_schemas_match() -> None:
     service_root = Path(__file__).parents[3]
     notification_document = yaml.safe_load((service_root / "docs" / "asyncapi.yaml").read_text())
-    backend_document = yaml.safe_load((service_root.parent / "backend" / "docs" / "asyncapi.yaml").read_text())
+    backend_document = load_sibling_asyncapi("backend")
 
     notification_schema = notification_document["components"]["schemas"]["CallbackRequestedPayload"]
     backend_schema = backend_document["components"]["schemas"]["CallbackRequestedPayload"]
