@@ -1,7 +1,11 @@
 from .client import NatsJetstreamClient
 from .consumers import CallbackRequestConsumer
 from .handlers import CallbackRequestHandler
-from .publisher import NatsEventPublisher, NotificationCommandsSendEmailEventPublisher
+from .publisher import (
+    NatsEventPublisher,
+    NotificationCommandsSendEmailEventPublisher,
+    NotificationCommandsSendVkEventPublisher,
+)
 
 __all__ = [
     "NatsJetstreamClient",
@@ -9,4 +13,5 @@ __all__ = [
     "CallbackRequestHandler",
     "NatsEventPublisher",
     "NotificationCommandsSendEmailEventPublisher",
+    "NotificationCommandsSendVkEventPublisher",
 ]

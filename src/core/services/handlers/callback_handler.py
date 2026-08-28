@@ -1,10 +1,11 @@
 import logging
 import uuid
+from datetime import UTC, datetime
 from html import escape
 
 from core.entities.event import EventEntity
 from core.protocols.clients import EmailServiceClientProtocol, MainBackendClientProtocol
-from core.schemas.messaging import NotificationCommandSendEmailData
+from core.schemas.messaging import NotificationCommandSendEmailData, NotificationCommandSendVkData
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +30,8 @@ class CallbackEventHandler:
         payload: dict,
         event: EventEntity,
         enabled_user_ids: set[uuid.UUID],
-    ) -> NotificationCommandSendEmailData | None:
-        if channel_code != "email":
+    ) -> NotificationCommandSendEmailData | NotificationCommandSendVkData | None:
+        if channel_code not in {"email", "vk"}:
             logger.warning("Unsupported channel for callback: %s", channel_code)
             return None
 
@@ -43,15 +44,33 @@ class CallbackEventHandler:
             logger.exception("Invalid tenant identity; callback notification suppressed")
             return None
 
-        recipient_emails = await self._get_recipient_emails(
+        recipient_ids = await self._get_recipient_ids(
             equestrian_id=equestrian_id,
             enabled_user_ids=enabled_user_ids,
         )
-        if not recipient_emails:
-            logger.warning("No admin emails found, skipping notification")
+        if not recipient_ids:
+            logger.warning("No eligible recipients found, skipping notification")
             return None
 
         event_uuid = uuid.uuid4()
+        if channel_code == "vk":
+            try:
+                callback_request_id = uuid.UUID(str(payload["callback_request_id"]))
+            except KeyError, TypeError, ValueError:
+                logger.exception("Invalid callback identity; VK notification suppressed")
+                return None
+            return NotificationCommandSendVkData(
+                occurred_at=payload.get("occurred_at") or datetime.now(UTC),
+                event_uuid=event_uuid,
+                callback_request_id=callback_request_id,
+                user_ids=sorted(recipient_ids, key=str),
+                text=self._build_vk_text(name=name, phone=phone, comment=comment),
+            )
+
+        recipient_emails = await self._get_recipient_emails(recipient_ids=recipient_ids)
+        if not recipient_emails:
+            logger.warning("No confirmed admin emails found, skipping notification")
+            return None
         subject = "Новый запрос на обратный звонок"
         body = self._build_email_body(
             name=name,
@@ -68,34 +87,44 @@ class CallbackEventHandler:
             from_email=None,
         )
 
-    async def _get_recipient_emails(
+    async def _get_recipient_ids(
         self,
         *,
         equestrian_id: uuid.UUID,
         enabled_user_ids: set[uuid.UUID],
-    ) -> list[str]:
-        """Intersect current role eligibility, enabled settings and confirmed emails."""
+    ) -> set[uuid.UUID]:
+        """Intersect current tenant/role eligibility with channel settings."""
         if not enabled_user_ids:
-            return []
+            return set()
         try:
             eligible_users = await self._main_backend_client.get_users(
                 equestrian_ids=[equestrian_id],
                 role=list(CALLBACK_ELIGIBLE_ROLES),
             )
             eligible_ids = {user.id for user in eligible_users.items}
-            recipient_ids = eligible_ids & enabled_user_ids
-            if not recipient_ids:
-                logger.info("No eligible users with enabled callback email setting")
-                return []
-
-            emails = await self._email_service_client.get_user_emails(
-                user_ids=list(recipient_ids),
-                approved=True,
-            )
-            return [email.email for email in emails if email.approved and email.user_id in recipient_ids]
+            return eligible_ids & enabled_user_ids
         except Exception:
             logger.exception("Recipient lookup failed; callback notification suppressed")
+            return set()
+
+    async def _get_recipient_emails(self, *, recipient_ids: set[uuid.UUID]) -> list[str]:
+        try:
+            emails = await self._email_service_client.get_user_emails(user_ids=list(recipient_ids), approved=True)
+            return [email.email for email in emails if email.approved and email.user_id in recipient_ids]
+        except Exception:
+            logger.exception("Email destination lookup failed; callback notification suppressed")
             return []
+
+    @staticmethod
+    def _build_vk_text(*, name: str | None, phone: str | None, comment: str | None) -> str:
+        return "\n".join(
+            (
+                "Новый запрос на обратный звонок",
+                f"Имя: {name or 'Не указано'}",
+                f"Телефон: {phone or 'Не указан'}",
+                f"Комментарий: {comment or 'Без комментария'}",
+            )
+        )
 
     @staticmethod
     def _build_email_body(

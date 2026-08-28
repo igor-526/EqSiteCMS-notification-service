@@ -1,7 +1,12 @@
 from uuid import UUID
 
 from clients.nats.client import NatsJetstreamClient
-from core.schemas.messaging import MessagingBaseEventData, MessagingEvent, NotificationCommandSendEmailData
+from core.schemas.messaging import (
+    MessagingBaseEventData,
+    MessagingEvent,
+    NotificationCommandSendEmailData,
+    NotificationCommandSendVkData,
+)
 from settings import NatsSettings
 
 
@@ -44,6 +49,16 @@ class NotificationCommandsSendEmailEventPublisher(NatsEventPublisher):
         event = MessagingEvent(
             event_id=idempotency_key or UUID(str(payload.event_uuid)),
             event_subject=self._settings.nats_subject_notification_commands_send_email,
+        )
+        await self._publish_event(event=event, payload=payload)
+        return event.event_id
+
+
+class NotificationCommandsSendVkEventPublisher(NatsEventPublisher):
+    async def publish(self, *, payload: NotificationCommandSendVkData, idempotency_key: UUID | None = None) -> UUID:
+        event = MessagingEvent(
+            event_id=idempotency_key or payload.callback_request_id,
+            event_subject=self._settings.nats_subject_notification_commands_send_vk,
         )
         await self._publish_event(event=event, payload=payload)
         return event.event_id

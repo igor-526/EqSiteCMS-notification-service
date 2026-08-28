@@ -5,8 +5,11 @@ from uuid import UUID
 from core.entities.channel import ChannelEntity
 from core.entities.event import EventEntity
 from core.protocols.clients import EmailServiceClientProtocol, MainBackendClientProtocol
-from core.protocols.messaging import NotificationCommandSendEmailPublisherProtocol
-from core.schemas.messaging import NotificationCommandSendEmailData
+from core.protocols.messaging import (
+    NotificationCommandSendEmailPublisherProtocol,
+    NotificationCommandSendVkPublisherProtocol,
+)
+from core.schemas.messaging import NotificationCommandSendEmailData, NotificationCommandSendVkData
 from repositories.channel import ChannelRepository
 from repositories.event import EventRepository
 from repositories.user_notification_setting import UserNotificationSettingRepository
@@ -22,7 +25,7 @@ class EventHandlerProtocol(Protocol):
         payload: dict,
         event: EventEntity,
         enabled_user_ids: set[UUID],
-    ) -> NotificationCommandSendEmailData | None: ...
+    ) -> NotificationCommandSendEmailData | NotificationCommandSendVkData | None: ...
 
 
 class NotificationOrchestratorService:
@@ -33,6 +36,7 @@ class NotificationOrchestratorService:
         event_repository: EventRepository,
         user_setting_repository: UserNotificationSettingRepository,
         email_publisher: NotificationCommandSendEmailPublisherProtocol,
+        vk_publisher: NotificationCommandSendVkPublisherProtocol,
         main_backend_client: MainBackendClientProtocol,
         email_service_client: EmailServiceClientProtocol,
     ) -> None:
@@ -40,6 +44,7 @@ class NotificationOrchestratorService:
         self._event_repository = event_repository
         self._user_setting_repository = user_setting_repository
         self._email_publisher = email_publisher
+        self._vk_publisher = vk_publisher
         self._main_backend_client = main_backend_client
         self._email_service_client = email_service_client
         self._handlers: dict[str, EventHandlerProtocol] = {}
@@ -94,20 +99,29 @@ class NotificationOrchestratorService:
 
         # 5. Для каждого канала сформировать и отправить уведомление
         published = False
+        first_error: Exception | None = None
         for channel in channels:
-            channel_published = await self._process_channel(
-                handler=handler,
-                channel=channel,
-                event=event,
-                payload=payload,
-                enabled_user_ids={setting.user_id for setting in user_settings if setting.channel_id == channel.id},
-            )
-            published = channel_published or published
+            try:
+                channel_published = await self._process_channel(
+                    handler=handler,
+                    channel=channel,
+                    event=event,
+                    payload=payload,
+                    enabled_user_ids={
+                        setting.user_id for setting in user_settings if setting.channel_id == channel.id
+                    },
+                )
+                published = channel_published or published
+            except Exception as exc:
+                logger.exception("Channel processing failed: channel_code=%s", channel.code)
+                first_error = first_error or exc
 
         if published and event_code == "callback":
             if not correlation_id:
                 raise ValueError("callback_request_id is required for delivery confirmation")
             await self._main_backend_client.confirm_callback_delivery(callback_request_id=UUID(str(correlation_id)))
+        if first_error is not None:
+            raise first_error
 
     async def _process_channel(
         self,
@@ -143,10 +157,19 @@ class NotificationOrchestratorService:
         # Отправить команду на доставку
         correlation_id = payload.get("callback_request_id")
         idempotency_key = UUID(str(correlation_id)) if correlation_id else None
-        event_id = await self._email_publisher.publish(
-            payload=notification,
-            idempotency_key=idempotency_key,
-        )
+        if channel.code == "email" and isinstance(notification, NotificationCommandSendEmailData):
+            event_id = await self._email_publisher.publish(
+                payload=notification,
+                idempotency_key=idempotency_key,
+            )
+        elif channel.code == "vk" and isinstance(notification, NotificationCommandSendVkData):
+            event_id = await self._vk_publisher.publish(
+                payload=notification,
+                idempotency_key=idempotency_key,
+            )
+        else:
+            logger.error("Unsupported notification DTO: channel_code=%s", channel.code)
+            return False
         logger.info(
             "Notification command published: event_id=%s, channel_code=%s, correlation_id=%s",
             event_id,

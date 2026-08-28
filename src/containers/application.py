@@ -7,6 +7,7 @@ from clients.nats import (
     CallbackRequestHandler,
     NatsJetstreamClient,
     NotificationCommandsSendEmailEventPublisher,
+    NotificationCommandsSendVkEventPublisher,
 )
 from core.services import (
     CallbackEventHandler,
@@ -36,6 +37,11 @@ class ApplicationContainer(containers.DeclarativeContainer):
 
     notification_commands_send_email_publisher = providers.Singleton(
         NotificationCommandsSendEmailEventPublisher,
+        client=nats_client,
+        settings=nats_settings,
+    )
+    notification_commands_send_vk_publisher = providers.Singleton(
+        NotificationCommandsSendVkEventPublisher,
         client=nats_client,
         settings=nats_settings,
     )
@@ -84,6 +90,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
         event_repository=event_repository,
         user_setting_repository=user_notification_setting_repository,
         email_publisher=notification_commands_send_email_publisher,
+        vk_publisher=notification_commands_send_vk_publisher,
         main_backend_client=main_backend_client,
         email_service_client=email_service_client,
     )

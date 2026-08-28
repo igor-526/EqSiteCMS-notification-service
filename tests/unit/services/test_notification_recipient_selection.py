@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 
 from core.entities.event import EventEntity
+from core.schemas.messaging import NotificationCommandSendEmailData
 from core.services.handlers.callback_handler import CallbackEventHandler
 
 
@@ -43,7 +44,8 @@ async def test_enabled_and_current_role_ids_are_intersected() -> None:
         enabled_user_ids={enabled_eligible, uuid4()},
     )
 
-    assert result is not None and result.to == ["enabled@example.com"]
+    assert isinstance(result, NotificationCommandSendEmailData)
+    assert result.to == ["enabled@example.com"]
     assert set(email.get_user_emails.await_args.kwargs["user_ids"]) == {enabled_eligible}
     backend.get_users.assert_awaited_once_with(
         equestrian_ids=[uuid.UUID(payload_data["equestrian_id"])],

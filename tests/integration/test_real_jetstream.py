@@ -178,9 +178,13 @@ async def main():
     client = NatsJetstreamClient(settings)
     await client.connect()
     try:
-        await CallbackRequestEventPublisher(client=client, settings=settings).publish(
-            payload=CallbackRequestedData(callback_request_id=uuid.uuid4(), phone='+70000000000'),
-        )
+            await CallbackRequestEventPublisher(client=client, settings=settings).publish(
+                payload=CallbackRequestedData(
+                    callback_request_id=uuid.uuid4(),
+                    equestrian_id=uuid.uuid4(),
+                    phone='+70000000000',
+                ),
+            )
     finally:
         await client.close()
 asyncio.run(main())

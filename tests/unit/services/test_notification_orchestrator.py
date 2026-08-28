@@ -5,6 +5,7 @@ import pytest
 
 from core.entities.channel import ChannelEntity
 from core.entities.event import EventEntity
+from core.schemas.messaging import NotificationCommandSendEmailData
 from core.services.notification_orchestrator import NotificationOrchestratorService
 
 
@@ -29,6 +30,11 @@ def mock_email_publisher():
 
 
 @pytest.fixture
+def mock_vk_publisher():
+    return AsyncMock()
+
+
+@pytest.fixture
 def mock_main_backend_client():
     return AsyncMock()
 
@@ -44,6 +50,7 @@ def orchestrator(
     mock_event_repository,
     mock_user_setting_repository,
     mock_email_publisher,
+    mock_vk_publisher,
     mock_main_backend_client,
     mock_email_service_client,
 ):
@@ -52,6 +59,7 @@ def orchestrator(
         event_repository=mock_event_repository,
         user_setting_repository=mock_user_setting_repository,
         email_publisher=mock_email_publisher,
+        vk_publisher=mock_vk_publisher,
         main_backend_client=mock_main_backend_client,
         email_service_client=mock_email_service_client,
     )
@@ -99,7 +107,9 @@ class TestNotificationOrchestrator:
 
         # Регистрируем мок-обработчик
         mock_handler = AsyncMock()
-        mock_handler.format_notification.return_value = MagicMock()
+        mock_handler.format_notification.return_value = NotificationCommandSendEmailData(
+            event_uuid=uuid4(), to=["owner@example.test"], subject="Callback", body="Body"
+        )
         orchestrator.register_handler("callback", mock_handler)
 
         callback_request_id = uuid4()
@@ -223,7 +233,9 @@ class TestNotificationOrchestrator:
         mock_channel_repository.get_active_channels.return_value = [sample_channel]
         orchestrator._user_setting_repository.get_users_by_event.return_value = []
         handler = AsyncMock()
-        handler.format_notification.return_value = MagicMock()
+        handler.format_notification.return_value = NotificationCommandSendEmailData(
+            event_uuid=uuid4(), to=["owner@example.test"], subject="Callback", body="Body"
+        )
         orchestrator.register_handler("callback", handler)
         orchestrator._email_publisher.publish.side_effect = RuntimeError("publish failed")
 
@@ -244,7 +256,9 @@ class TestNotificationOrchestrator:
         mock_channel_repository.get_active_channels.return_value = [sample_channel]
         orchestrator._user_setting_repository.get_users_by_event.return_value = []
         handler = AsyncMock()
-        handler.format_notification.return_value = MagicMock()
+        handler.format_notification.return_value = NotificationCommandSendEmailData(
+            event_uuid=uuid4(), to=["owner@example.test"], subject="Callback", body="Body"
+        )
         orchestrator.register_handler("callback", handler)
         orchestrator._email_publisher.publish.return_value = callback_request_id
         orchestrator._main_backend_client.confirm_callback_delivery.side_effect = RuntimeError("service failed")

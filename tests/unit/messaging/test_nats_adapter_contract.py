@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import AsyncMock
@@ -147,6 +148,7 @@ async def test_callback_handler_accepts_payload_with_tenant_identity() -> None:
         event_code="callback",
         payload={
             "callback_request_id": str(callback_request_id),
+            "occurred_at": datetime(2026, 8, 24, 12, tzinfo=UTC),
             "equestrian_id": str(equestrian_id),
             "name": None,
             "phone": "+70000000000",

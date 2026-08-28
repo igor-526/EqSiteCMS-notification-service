@@ -104,6 +104,10 @@ class NatsSettings(BaseSettings):
         default="commands.notification.email.send",
         alias="NATS_SUBJECT_NOTIFICATION_COMMANDS_SEND_EMAIL",
     )
+    nats_subject_notification_commands_send_vk: str = Field(
+        default="commands.notification.vk.send",
+        alias="NATS_SUBJECT_NOTIFICATION_COMMANDS_SEND_VK",
+    )
     nats_subjects_notification_commands_raw: str = Field(
         default="commands.notification.>", alias="NATS_SUBJECTS_NOTIFICATION_COMMANDS"
     )
