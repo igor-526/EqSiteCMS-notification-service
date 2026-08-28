@@ -158,22 +158,33 @@ class NotificationOrchestratorService:
         correlation_id = payload.get("callback_request_id")
         idempotency_key = UUID(str(correlation_id)) if correlation_id else None
         if channel.code == "email" and isinstance(notification, NotificationCommandSendEmailData):
-            event_id = await self._email_publisher.publish(
+            published = await self._email_publisher.publish(
                 payload=notification,
                 idempotency_key=idempotency_key,
             )
         elif channel.code == "vk" and isinstance(notification, NotificationCommandSendVkData):
-            event_id = await self._vk_publisher.publish(
+            published = await self._vk_publisher.publish(
                 payload=notification,
                 idempotency_key=idempotency_key,
             )
         else:
             logger.error("Unsupported notification DTO: channel_code=%s", channel.code)
             return False
+        if published.duplicate:
+            # Идентификатор команды уникален в пределах stream и стабилен между обработками,
+            # поэтому duplicate означает повторную обработку того же события: команда уже
+            # принята брокером ранее и будет доставлена. Канал считается принятым.
+            logger.warning(
+                "Notification command already accepted earlier: message_id=%s, channel_code=%s, correlation_id=%s",
+                published.message_id,
+                channel.code,
+                correlation_id,
+            )
+            return True
         logger.info(
             "Notification command published: event_id=%s, channel_code=%s, correlation_id=%s",
-            event_id,
+            published.message_id,
             channel.code,
-            payload.get("callback_request_id"),
+            correlation_id,
         )
         return True

@@ -15,6 +15,7 @@ from core.entities.event import EventEntity
 from core.schemas.messaging import (
     NotificationCommandSendEmailData,
     NotificationCommandSendVkData,
+    build_command_msg_id,
 )
 from core.services.handlers.callback_handler import CallbackEventHandler
 from core.services.notification_orchestrator import NotificationOrchestratorService
@@ -78,18 +79,20 @@ class RecordingNatsClient:
 
 
 @pytest.mark.asyncio
-async def test_ut07_ut08_vk_publisher_uses_subject_and_callback_msg_id() -> None:
+async def test_ut07_ut08_vk_publisher_uses_subject_and_channel_scoped_msg_id() -> None:
     client = RecordingNatsClient()
     publisher = NotificationCommandsSendVkEventPublisher(
         client=cast(NatsJetstreamClient, client), settings=NatsSettings()
     )
     payload = NotificationCommandSendVkData.model_validate(vk_payload())
+    expected_msg_id = build_command_msg_id(correlation_id=payload.callback_request_id, channel_code="vk")
 
-    published_id = await publisher.publish(payload=payload, idempotency_key=payload.callback_request_id)
+    published = await publisher.publish(payload=payload, idempotency_key=payload.callback_request_id)
 
     assert client.calls[0]["subject"] == "commands.notification.vk.send"
-    assert client.calls[0]["headers"] == {"Nats-Msg-Id": str(payload.callback_request_id)}
-    assert published_id == payload.callback_request_id
+    assert client.calls[0]["headers"] == {"Nats-Msg-Id": str(expected_msg_id)}
+    assert published.message_id == expected_msg_id
+    assert published.duplicate is False
 
 
 def test_ut09_notification_asyncapi_vk_schema_matches_runtime_dto_shape() -> None:

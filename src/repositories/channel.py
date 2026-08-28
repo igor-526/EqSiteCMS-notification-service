@@ -18,6 +18,8 @@ class ChannelRepository(AbstractRepository[ChannelEntity]):
         return self.entity.model_validate(dict(mapping))
 
     async def get_active_channels(self) -> list[ChannelEntity]:
-        stmt = select(self.table).where(self.table.c.is_active == True)  # noqa: E712
+        # Детерминированный порядок: состав и очерёдность публикуемых команд не должны зависеть
+        # от физического порядка строк.
+        stmt = select(self.table).where(self.table.c.is_active == True).order_by(self.table.c.code)  # noqa: E712
         rows = await self.session.execute(stmt)
         return [self.entity.model_validate(dict(row)) for row in rows.mappings().all()]

@@ -1,8 +1,13 @@
 import re
 from dataclasses import dataclass
-from uuid import UUID, uuid4
+from uuid import UUID
 
-from core.schemas.messaging import NotificationCommandSendEmailData, NotificationCommandSendVkData
+from core.schemas.messaging import (
+    NotificationCommandSendEmailData,
+    NotificationCommandSendVkData,
+    PublishedCommand,
+    build_command_msg_id,
+)
 from smoke_harness.config import PublisherOutcome, RecipientFixture
 
 
@@ -41,7 +46,7 @@ class ScriptedEmailPublisher:
         *,
         payload: NotificationCommandSendEmailData,
         idempotency_key: UUID | None = None,
-    ) -> UUID:
+    ) -> PublishedCommand:
         if idempotency_key != self._callback_request_id:
             raise ScriptedPublishError("publisher target is outside the synthetic callback")
         if set(payload.to) != set(self._expected_recipients):
@@ -50,7 +55,10 @@ class ScriptedEmailPublisher:
         self.attempts += 1
         if self._outcome is PublisherOutcome.FAIL:
             raise ScriptedPublishError("scripted email publisher failure")
-        return uuid4()
+        return PublishedCommand(
+            message_id=build_command_msg_id(correlation_id=self._callback_request_id, channel_code="email"),
+            duplicate=False,
+        )
 
     def evidence(self) -> ChannelEvidence:
         return ChannelEvidence(
@@ -85,7 +93,7 @@ class ScriptedVkPublisher:
         *,
         payload: NotificationCommandSendVkData,
         idempotency_key: UUID | None = None,
-    ) -> UUID:
+    ) -> PublishedCommand:
         if idempotency_key != self._callback_request_id or payload.callback_request_id != self._callback_request_id:
             raise ScriptedPublishError("publisher target is outside the synthetic callback")
         if set(payload.user_ids) != set(self._expected_recipients):
@@ -105,7 +113,10 @@ class ScriptedVkPublisher:
         self.attempts += 1
         if self._outcome is PublisherOutcome.FAIL:
             raise ScriptedPublishError("scripted VK publisher failure")
-        return uuid4()
+        return PublishedCommand(
+            message_id=build_command_msg_id(correlation_id=self._callback_request_id, channel_code="vk"),
+            duplicate=False,
+        )
 
     def evidence(self) -> ChannelEvidence:
         return ChannelEvidence(

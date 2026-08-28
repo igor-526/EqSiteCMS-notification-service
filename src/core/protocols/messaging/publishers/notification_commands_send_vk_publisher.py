@@ -1,7 +1,7 @@
 from typing import Protocol
 from uuid import UUID
 
-from core.schemas.messaging import NotificationCommandSendVkData
+from core.schemas.messaging import NotificationCommandSendVkData, PublishedCommand
 
 
 class NotificationCommandSendVkPublisherProtocol(Protocol):
@@ -10,4 +10,4 @@ class NotificationCommandSendVkPublisherProtocol(Protocol):
         *,
         payload: NotificationCommandSendVkData,
         idempotency_key: UUID | None = None,
-    ) -> UUID: ...
+    ) -> PublishedCommand: ...

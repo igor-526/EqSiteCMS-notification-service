@@ -1,7 +1,7 @@
 from typing import Protocol
 from uuid import UUID
 
-from core.schemas.messaging import NotificationCommandSendEmailData
+from core.schemas.messaging import NotificationCommandSendEmailData, PublishedCommand
 
 
 class NotificationCommandSendEmailPublisherProtocol(Protocol):
@@ -10,4 +10,4 @@ class NotificationCommandSendEmailPublisherProtocol(Protocol):
         *,
         payload: NotificationCommandSendEmailData,
         idempotency_key: UUID | None = None,
-    ) -> UUID: ...
+    ) -> PublishedCommand: ...

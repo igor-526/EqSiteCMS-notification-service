@@ -5,7 +5,7 @@ import pytest
 
 from core.entities.channel import ChannelEntity
 from core.entities.event import EventEntity
-from core.schemas.messaging import NotificationCommandSendEmailData
+from core.schemas.messaging import NotificationCommandSendEmailData, PublishedCommand
 from core.services.notification_orchestrator import NotificationOrchestratorService
 
 
@@ -101,7 +101,7 @@ class TestNotificationOrchestrator:
     ):
         mock_event_repository.get_by_code.return_value = sample_event
         mock_channel_repository.get_active_channels.return_value = [sample_channel]
-        mock_email_publisher.publish.return_value = uuid4()
+        mock_email_publisher.publish.return_value = PublishedCommand(message_id=uuid4(), duplicate=False)
         setting = MagicMock(user_id=uuid4(), channel_id=sample_channel.id)
         orchestrator._user_setting_repository.get_users_by_event.return_value = [setting]
 
@@ -260,7 +260,7 @@ class TestNotificationOrchestrator:
             event_uuid=uuid4(), to=["owner@example.test"], subject="Callback", body="Body"
         )
         orchestrator.register_handler("callback", handler)
-        orchestrator._email_publisher.publish.return_value = callback_request_id
+        orchestrator._email_publisher.publish.return_value = PublishedCommand(message_id=uuid4(), duplicate=False)
         orchestrator._main_backend_client.confirm_callback_delivery.side_effect = RuntimeError("service failed")
 
         with pytest.raises(RuntimeError, match="service failed"):

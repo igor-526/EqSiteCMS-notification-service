@@ -7,6 +7,7 @@ from dependency_injector import providers
 from containers.application import ApplicationContainer, wire_event_handlers
 from core.entities.channel import ChannelEntity
 from core.entities.event import EventEntity
+from core.schemas.messaging import PublishedCommand
 
 
 @pytest.mark.asyncio
@@ -29,7 +30,7 @@ async def test_production_container_wires_single_callback_path_and_publishes() -
         MagicMock(user_id=recipient_id, email="eligible@example.com", approved=True)
     ]
     publisher = AsyncMock()
-    publisher.publish.return_value = uuid4()
+    publisher.publish.return_value = PublishedCommand(message_id=uuid4(), duplicate=False)
 
     container.event_repository.override(providers.Object(event_repository))
     container.channel_repository.override(providers.Object(channel_repository))

@@ -14,7 +14,7 @@ from clients.nats.publisher import NotificationCommandsSendEmailEventPublisher
 from core.protocols.messaging.handlers.callback_request import (
     CallbackRequestHandlerProtocol,
 )
-from core.schemas.messaging import CallbackRequestedData, NotificationCommandSendEmailData
+from core.schemas.messaging import CallbackRequestedData, NotificationCommandSendEmailData, build_command_msg_id
 from settings import NatsSettings
 from tests.support.cross_repo import load_sibling_asyncapi
 
@@ -75,13 +75,14 @@ async def test_notification_email_publisher_matches_subject_headers_and_payload(
     )
 
     idempotency_key = uuid4()
-    event_id = await publisher.publish(payload=payload, idempotency_key=idempotency_key)
+    expected_msg_id = build_command_msg_id(correlation_id=idempotency_key, channel_code="email")
+    published = await publisher.publish(payload=payload, idempotency_key=idempotency_key)
 
     call = client.calls[0]
     decoded = NotificationCommandSendEmailData.model_validate_json(call["payload"])
     assert call["subject"] == "commands.notification.email.send"
-    assert event_id == idempotency_key
-    assert call["headers"] == {"Nats-Msg-Id": str(idempotency_key)}
+    assert published.message_id == expected_msg_id
+    assert call["headers"] == {"Nats-Msg-Id": str(expected_msg_id)}
     assert decoded == payload
 
 

@@ -114,12 +114,30 @@ GET /health
 
 Настройки уведомлений пользователей.
 
-## NATS
+## NATS JetStream
 
-### Потребляемые события
+| Stream | Subject | Durable | Назначение | Роль |
+|---|---|---|---|---|
+| `SITE_EVENTS` | `events.site.callback.requested` | `notification-service-callback-requested` | Заявка на обратный звонок | входящий |
+| `NOTIFICATION_COMMANDS` | `commands.notification.email.send` | — | Команда на отправку email | исходящий |
+| `NOTIFICATION_COMMANDS` | `commands.notification.vk.send` | — | Команда на отправку VK-сообщения | исходящий |
 
-- `events.site.callback.requested` — заявка на обратный звонок
+Notification Service владеет stream `NOTIFICATION_COMMANDS` и создаёт собственный durable
+на чужом stream `SITE_EVENTS`.
 
-### Публикуемые команды
+### Идентичность команд
 
-- `commands.notification.email.send` — команда на отправку email
+Дедупликация JetStream действует на уровне stream, а не subject, поэтому `Nats-Msg-Id`
+уникален в пределах `NOTIFICATION_COMMANDS` и различается между каналами одной заявки:
+
+```text
+Nats-Msg-Id = uuid5(NAMESPACE_NOTIFICATION_COMMAND, "<callback_request_id>:<channel_code>")
+NAMESPACE_NOTIFICATION_COMMAND = uuid5(NAMESPACE_DNS, "notification-commands.eqcms")
+```
+
+`Nats-Msg-Id` не равен `callback_request_id`: равенство приводило бы к тому, что вторая
+команда одной заявки отбрасывается брокером как дубликат. Значение детерминировано, поэтому
+redelivery события не порождает повторную пользовательскую отправку. `PubAck.duplicate`
+проверяется и логируется на уровне `warning`.
+
+Проверка схемы: `npx --yes @asyncapi/cli validate docs/asyncapi.yaml`.

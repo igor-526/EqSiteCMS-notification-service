@@ -102,3 +102,14 @@ class TestChannelRepository:
         result = await channel_repository.get_active_channels()
 
         assert len(result) == 0
+
+    @pytest.mark.asyncio
+    async def test_get_active_channels_is_ordered_by_code(self, channel_repository, mock_session):
+        mock_result = MagicMock()
+        mock_result.mappings.return_value.all.return_value = []
+        mock_session.execute.return_value = mock_result
+
+        await channel_repository.get_active_channels()
+
+        statement = mock_session.execute.await_args.args[0]
+        assert "ORDER BY notification_channels.code" in str(statement)
