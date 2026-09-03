@@ -1,8 +1,9 @@
 import asyncio
 import logging
+from builtins import TimeoutError as BuiltinTimeoutError
 
 from nats.aio.msg import Msg
-from nats.errors import TimeoutError
+from nats.errors import TimeoutError as NatsTimeoutError
 from nats.js import JetStreamContext
 
 from clients.nats.client import NatsJetstreamClient
@@ -73,7 +74,7 @@ class CallbackRequestConsumer:
                     batch=self._settings.nats_consumer_fetch_batch_size,
                     timeout=self._settings.nats_consumer_fetch_timeout_seconds,
                 )
-            except TimeoutError:
+            except BuiltinTimeoutError, NatsTimeoutError:
                 continue
             except asyncio.CancelledError:
                 raise
