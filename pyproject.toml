@@ -65,3 +65,5 @@ typeCheckingMode = "standard"
 reportMissingImports = "error"
 reportMissingModuleSource = "error"
 reportImportCycles = "warning"
+[tool.uv]
+cache-dir = "/home/igor/projects/eqSiteCMS/.cache/uv"
