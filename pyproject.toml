@@ -66,4 +66,4 @@ reportMissingImports = "error"
 reportMissingModuleSource = "error"
 reportImportCycles = "warning"
 [tool.uv]
-cache-dir = "/home/igor/projects/eqSiteCMS/.cache/uv"
+cache-dir = "/srv/eqSiteCMS/.cache/uv"
